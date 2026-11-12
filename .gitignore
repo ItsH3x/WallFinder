@@ -35,5 +35,6 @@ Makefile
 scripts/update_kde_wallpapers.py.bak*
 
 # Core dump
-core
-core.*
+/core
+/core.*
+

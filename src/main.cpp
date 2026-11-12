@@ -623,10 +623,10 @@ int main() {
     assert(kde_json["KPlugin"]["Id"] == "wallhaven_reg_test_42");
     assert(kde_json["KPlugin"]["Name"] == "Wallhaven reg_test_42");
 
-    // KDE flat file verification
-    std::filesystem::path kde_flat_img = test_sys_share / "wallpapers" / reg_sample_bmp.filename();
-    assert(std::filesystem::exists(kde_flat_img));
-    std::cout << "    * KDE Plasma: Paquete de fondo, metadata.json y enlace plano creados correctamente.\n";
+    // KDE screenshot / thumbnail verification (evita archivos planos redundantes que duplican en KDE)
+    std::filesystem::path kde_screenshot = test_sys_share / "wallpapers" / "wallhaven_reg_test_42" / "contents" / "screenshot.png";
+    assert(std::filesystem::exists(kde_screenshot));
+    std::cout << "    * KDE Plasma: Paquete de fondo, metadata.json y miniatura screenshot creados correctamente.\n";
 
     // 2. GNOME verification: ~/.local/share/backgrounds/<filename> + XML
     std::filesystem::path gnome_bg_img = test_sys_share / "backgrounds" / reg_sample_bmp.filename();
