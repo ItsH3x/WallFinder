@@ -24,6 +24,7 @@ struct SearchQuery {
     bool combine_colors = false;        // true: busca ambos colores en el mismo fondo
     std::string color_temperature;      // "warm", "cool", "neutral", o vacío
     int page = 1;
+    bool allow_nsfw = false;            // Permite contenido para adultos / NSFW (+18)
 };
 
 // Resultado paginado: el proveedor puede consumir varias páginas de la API remota

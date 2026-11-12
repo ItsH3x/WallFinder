@@ -6,6 +6,7 @@
 #include "core/texture_cache.hpp"
 #include "core/wallpaper_setter.hpp"
 #include "net/wallpaper_provider.hpp"
+#include "net/aggregate_provider.hpp"
 #include "ui/grid_view.hpp"
 #include "ui/preview_modal.hpp"
 
@@ -54,7 +55,7 @@ private:
 
     std::shared_ptr<ThreadPool> thread_pool_;
     std::unique_ptr<TextureCache> texture_cache_;
-    std::shared_ptr<IWallpaperProvider> provider_;
+    std::shared_ptr<AggregateProvider> provider_;
     WallpaperSetter wallpaper_setter_;
 
     GridView grid_view_;
@@ -64,6 +65,8 @@ private:
     char search_text_[256]{};
     int selected_resolution_idx_{0};
     char custom_resolution_[64]{"1920x1080"};
+    WallpaperSource selected_source_{WallpaperSource::ALL};
+    bool allow_nsfw_{false};
 
     // Categorías (inactivas por defecto; si ninguna está activa se busca en General)
     bool cat_anime_{false};
@@ -101,6 +104,8 @@ private:
 
     [[nodiscard]] int get_active_filter_count() const noexcept {
         int count = 0;
+        if (selected_source_ != WallpaperSource::ALL) ++count;
+        if (allow_nsfw_) ++count;
         if (selected_resolution_idx_ != 0) ++count;
         if (selected_sort_idx_ != 0) ++count;
         if (cat_anime_) ++count;

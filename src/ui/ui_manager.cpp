@@ -186,7 +186,7 @@ UIManager::UIManager()
     : wallpaper_setter_(Config::instance().get_desktop_environment()) {
     thread_pool_ = std::make_shared<ThreadPool>(4);
     texture_cache_ = std::make_unique<TextureCache>(thread_pool_);
-    provider_ = std::make_shared<WallhavenProvider>();
+    provider_ = std::make_shared<AggregateProvider>(thread_pool_);
 }
 
 UIManager::~UIManager() {
@@ -565,6 +565,9 @@ SearchQuery UIManager::build_query(int page) const {
     }
     query.keywords = full_keywords;
 
+    query.allow_nsfw = allow_nsfw_;
+    query.purity = allow_nsfw_ ? "111" : "100";
+
     switch (selected_resolution_idx_) {
         case 1: query.resolution = ResolutionFilter::FHD_1080P; break;
         case 2: query.resolution = ResolutionFilter::QHD_1440P; break;
@@ -626,6 +629,8 @@ SearchQuery UIManager::build_query(int page) const {
 }
 
 void UIManager::reset_filters() {
+    selected_source_ = WallpaperSource::ALL;
+    allow_nsfw_ = false;
     selected_resolution_idx_ = 0;
     cat_anime_ = false;
     cat_people_ = false;
@@ -695,6 +700,7 @@ void UIManager::execute_search(bool reset) {
     }
     show_toast("Buscando fondos…", true, 2.0f);
 
+    provider_->set_source(selected_source_);
     SearchQuery query = build_query(1);
     thread_pool_->enqueue([this, query, gen]() {
         // Descarte temprano si la búsqueda ya caducó antes de iniciarse en el pool
@@ -749,6 +755,7 @@ void UIManager::load_more() {
 
     is_loading_more_ = true;
     unsigned gen = search_generation_.load();
+    provider_->set_source(selected_source_);
     SearchQuery query = build_query(next_page_.load());
 
     thread_pool_->enqueue([this, query, gen]() {
@@ -1219,8 +1226,23 @@ void UIManager::render_filters_panel() {
             dl->AddText(ImVec2(x, std::round(p.y + (header_h - ssz.y) * 0.5f)), active_filters ? kAccentHover : kTextSubtle, sub.c_str());
         }
 
-        float reset_w = 132.0f;
-        ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x - reset_w);
+        float nsfw_w = 112.0f;
+        float reset_w = 120.0f;
+        float gap_btn = 8.0f;
+        float total_right = reset_w + gap_btn + nsfw_w;
+        ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x - total_right);
+
+        // Botón NSFW (+18) con advertencia visual
+        if (theme::PillToggle("##FilterNSFW", icons::DrawAlert, "NSFW (+18)", allow_nsfw_, nsfw_w, header_h,
+                              allow_nsfw_ ? IM_COL32(239, 68, 68, 255) : 0)) {
+            allow_nsfw_ = !allow_nsfw_;
+            trigger_search(true, false);
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Permitir contenido explícito / para adultos (+18) en Reddit y Wallhaven");
+        }
+
+        ImGui::SameLine(0.0f, gap_btn);
         if (theme::Button("##ResetFilters", icons::DrawReset, "Restablecer", ImVec2(reset_w, header_h),
                           ButtonKind::Ghost, active_filters > 0)) {
             reset_filters();
@@ -1279,6 +1301,41 @@ void UIManager::render_filters_panel() {
     };
 
     auto render_section_resolution_order = [&]() {
+        SectionLabel("FUENTE");
+        struct SrcOpt {
+            const char* id;
+            const char* label;
+            IconFn icon;
+            WallpaperSource src;
+            const char* tip;
+        };
+        const SrcOpt src_opts[5] = {
+            { "##src_all", "Todas",     icons::DrawSparkle,      WallpaperSource::ALL,        "Busca en paralelo y combina Wallhaven, Reddit, Unsplash y Pexels" },
+            { "##src_wh",  "Wallhaven", icons::DrawPalette,      WallpaperSource::WALLHAVEN,  "Catálogo general, anime y arte digital" },
+            { "##src_rd",  "Reddit",    icons::DrawFlame,        WallpaperSource::REDDIT,     "Comunidades fotográficas y fondos de Reddit" },
+            { "##src_un",  "Unsplash",  icons::DrawMountain,     WallpaperSource::UNSPLASH,   "Fotografía artística de alta definición curada" },
+            { "##src_px",  "Pexels",    icons::DrawArchitecture, WallpaperSource::PEXELS,     "Fotografía real de alta resolución libre de derechos" }
+        };
+
+        const float g = 5.0f;
+        float avail = ImGui::GetContentRegionAvail().x;
+        int cols = (avail >= 440.0f) ? 5 : 3;
+        float w = std::min(106.0f, std::floor((avail - (cols - 1) * g) / cols));
+        for (int i = 0; i < 5; ++i) {
+            if (i % cols != 0) ImGui::SameLine(0.0f, g);
+            else if (i > 0) ImGui::Dummy(ImVec2(0.0f, g - ImGui::GetStyle().ItemSpacing.y));
+
+            bool active = (selected_source_ == src_opts[i].src);
+            if (PillToggle(src_opts[i].id, src_opts[i].icon, src_opts[i].label, active, w, 24.0f)) {
+                if (selected_source_ != src_opts[i].src) {
+                    selected_source_ = src_opts[i].src;
+                    trigger_search(true, false);
+                }
+            }
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", src_opts[i].tip);
+        }
+
+        ImGui::Dummy(ImVec2(0.0f, 4.0f));
         SectionLabel("RESOLUCIÓN");
         styled_combo_begin();
         if (combo("##ResCombo", &selected_resolution_idx_, kResolutionOptions, IM_ARRAYSIZE(kResolutionOptions), nullptr)) {

@@ -32,7 +32,7 @@ struct Lab {
 };
 
 // --- Umbrales (escala CIEDE2000) ---------------------------------------------
-inline constexpr float kMatchDeltaE   = 19.5f; // Mismo "familia" de color (ej. rojo ~ rojo oscuro)
+inline constexpr float kMatchDeltaE   = 22.0f; // Mismo "familia" de color (holgado sutilmente)
 inline constexpr float kForeignDeltaE = 30.0f; // Más allá de esto, un color es ajeno a la selección
 inline constexpr float kNeutralChroma = 12.5f; // Por debajo: gris/negro/blanco (sin tono real)
 inline constexpr float kVividChroma   = 18.0f; // Por encima: color con tono claramente perceptible
@@ -142,19 +142,19 @@ inline bool is_color_match(const Lab& target, const Lab& cand) {
 
     // 1. Blanco (ffffff): L >= 90, c <= 12
     if (target.L >= 90.0f && tc <= 12.0f) {
-        // Exige neutralidad (c <= 14) y luminosidad alta (L >= 65): capta gris claro y blanco, rechaza amarillo
-        return (cc <= 14.0f) && (cand.L >= 65.0f);
+        // Exige neutralidad (c <= 16) y luminosidad alta (L >= 60): capta blanco y blanco roto/gris suave, rechaza amarillo
+        return (cc <= 16.0f) && (cand.L >= 60.0f);
     }
 
     // 2. Negro (000000): L <= 15, c <= 12
     if (target.L <= 15.0f && tc <= 12.0f) {
-        // Exige neutralidad (c <= 16) y oscuridad profunda (L <= 28): capta gris muy oscuro y negro
-        return (cc <= 16.0f) && (cand.L <= 28.0f);
+        // Exige neutralidad (c <= 18) y oscuridad profunda (L <= 32): capta negro y gris muy oscuro
+        return (cc <= 18.0f) && (cand.L <= 32.0f);
     }
 
-    // 3. Colores cromáticos: el candidato DEBE tener saturación real (cc >= 14).
+    // 3. Colores cromáticos: el candidato DEBE tener saturación real (cc >= 13).
     // Esto asegura que amarillo NUNCA capte blanco ni grises neutros.
-    if (cc < 14.0f) {
+    if (cc < 13.0f) {
         return false;
     }
 
@@ -163,49 +163,49 @@ inline bool is_color_match(const Lab& target, const Lab& cand) {
         // Capta tinto/vino (h ~ 25, L baja), rojo puro (h ~ 40), rojo anaranjado (h <= 48).
         // Rechaza Naranja directo (h >= 55) y Rosa (h <= 18 o >= 335).
         bool is_red_hue = (ch >= 345.0f || ch <= 48.0f);
-        return is_red_hue && (cc >= 18.0f) && (de <= 26.0f || cand.L <= 55.0f);
+        return is_red_hue && (cc >= 16.0f) && (de <= 28.5f || cand.L <= 58.0f);
     }
 
     // 3.2. Naranja (ff9900, th ~ 68.7)
     if (th >= 50.0f && th <= 76.0f) {
-        // Rango de naranja estricto: rechaza rojo (<= 48) y amarillo (>= 78)
-        return (ch >= 52.0f && ch <= 76.0f) && (cc >= 18.0f) && (de <= 22.0f);
+        // Rango de naranja calibrado: rechaza rojo (<= 48) y amarillo (>= 78)
+        return (ch >= 50.0f && ch <= 78.0f) && (cc >= 16.0f) && (de <= 24.0f);
     }
 
     // 3.3. Amarillo (ffff00, th ~ 102.9)
     if (th >= 85.0f && th <= 112.0f) {
-        // Capta amarillo puro y amarillo muy claro (L alta, cc >= 16, h entre 78 y 115).
+        // Capta amarillo puro y amarillo muy claro (L alta, cc >= 15, h entre 76 y 116).
         // Rechaza Naranja (< 76) y Verde (> 118).
-        return (ch >= 78.0f && ch <= 115.0f) && (cc >= 16.0f) && (de <= 28.0f || cand.L >= 70.0f);
+        return (ch >= 76.0f && ch <= 116.0f) && (cc >= 15.0f) && (de <= 30.0f || cand.L >= 68.0f);
     }
 
     // 3.4. Verde (669900, th ~ 121.2)
     if (th >= 115.0f && th <= 165.0f) {
-        return (ch >= 115.0f && ch <= 165.0f) && (cc >= 16.0f) && (de <= 24.0f);
+        return (ch >= 112.0f && ch <= 168.0f) && (cc >= 15.0f) && (de <= 25.5f);
     }
 
     // 3.5. Cian (66cccc, th ~ 197.2)
     if (th >= 170.0f && th <= 225.0f) {
-        return (ch >= 170.0f && ch <= 225.0f) && (cc >= 14.0f) && (de <= 24.0f);
+        return (ch >= 168.0f && ch <= 228.0f) && (cc >= 13.0f) && (de <= 25.5f);
     }
 
     // 3.6. Azul (0066cc, th ~ 284.4)
     if (th >= 235.0f && th <= 298.0f) {
-        return (ch >= 235.0f && ch <= 298.0f) && (cc >= 16.0f) && (de <= 24.0f);
+        return (ch >= 232.0f && ch <= 300.0f) && (cc >= 15.0f) && (de <= 25.5f);
     }
 
     // 3.7. Morado (663399, th ~ 312.3)
     if (th >= 298.0f && th <= 335.0f) {
-        return (ch >= 298.0f && ch <= 335.0f) && (cc >= 16.0f) && (de <= 24.0f);
+        return (ch >= 296.0f && ch <= 338.0f) && (cc >= 15.0f) && (de <= 25.5f);
     }
 
     // 3.8. Rosa (ea4c88, th ~ 1.1)
     if (th >= 335.0f || th <= 15.0f) {
         bool is_pink_hue = (ch >= 335.0f || ch <= 18.0f);
-        return is_pink_hue && (cc >= 16.0f) && (de <= 24.0f);
+        return is_pink_hue && (cc >= 15.0f) && (de <= 25.5f);
     }
 
-    return de <= 20.0f;
+    return de <= 22.0f;
 }
 
 inline std::vector<Lab> palette_to_lab(const std::vector<std::string>& palette) {
@@ -316,10 +316,10 @@ inline MatchResult evaluate_dual(const std::vector<std::string>& palette,
     return {true, d_primary * 1.5f + d_secondary + static_cast<float>(foreign) * 10.0f};
 }
 
-// Umbral ultra-estricto para fondos verdaderamente monocromáticos (escala de grises pura, sin ningún tinte)
-inline constexpr float kStrictMonochromeChroma = 5.0f;
+// Umbral calibrado para fondos verdaderamente monocromáticos (escala de grises natural, tolera sutil tinte de lente)
+inline constexpr float kStrictMonochromeChroma = 7.5f;
 
-// Monocromo estricto: TODOS los colores de la paleta deben carecer de tono perceptible (croma <= 5.0).
+// Monocromo estricto: TODOS los colores de la paleta deben carecer de tono perceptible (croma <= 7.5).
 inline bool is_strict_monochrome(const std::vector<std::string>& palette) {
     auto pal = palette_to_lab(palette);
     if (pal.empty()) return false;

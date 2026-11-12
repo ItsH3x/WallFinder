@@ -6,6 +6,10 @@
 #include "core/wallpaper_setter.hpp"
 #include "net/http_client.hpp"
 #include "net/wallhaven_provider.hpp"
+#include "net/reddit_provider.hpp"
+#include "net/unsplash_provider.hpp"
+#include "net/pexels_provider.hpp"
+#include "net/aggregate_provider.hpp"
 #include "net/version_checker.hpp"
 
 #include <curl/curl.h>
@@ -811,7 +815,7 @@ int main() {
     // -------------------------------------------------------------------------
     // 9. Verificación del Escáner de Versiones en GitHub (VersionChecker)
     // -------------------------------------------------------------------------
-    std::cout << "[9/9] Verificando Escáner de Versiones en GitHub (VersionChecker)...\n";
+    std::cout << "[9/10] Verificando Escáner de Versiones en GitHub (VersionChecker)...\n";
     {
         // Comparación de versiones semver
         assert(wallpaper::VersionChecker::is_newer("1.0.1", "1.0.0"));
@@ -828,6 +832,177 @@ int main() {
         std::cout << "  - Consulta y manejo resiliente ante red/timeout: OK.\n";
     }
     std::cout << "  [OK] Escáner de versiones verificado exitosamente.\n\n";
+
+    // -------------------------------------------------------------------------
+    // 10. Verificación de Proveedores Multi-Fuente (Reddit, Unsplash, Pexels, Aggregate)
+    // -------------------------------------------------------------------------
+    std::cout << "[10/10] Verificando Proveedores Multi-Fuente y Filtros Unificados...\n";
+    {
+        // 10.1 RedditProvider
+        wallpaper::RedditProvider reddit;
+        assert(reddit.get_name() == "Reddit");
+
+        // Desescape de URLs de Reddit (&amp; -> &)
+        std::string raw_url = "https://preview.redd.it/test.png?width=640&amp;s=abc123xyz";
+        assert(wallpaper::RedditProvider::unescape_url(raw_url) == "https://preview.redd.it/test.png?width=640&s=abc123xyz");
+        std::cout << "  - Reddit URL unescape (&amp; -> &): OK.\n";
+
+        // Mapeo inteligente de subreddits y soporte NSFW
+        wallpaper::SearchQuery q_rd;
+        q_rd.categories = "010"; // Anime
+        q_rd.allow_nsfw = false;
+        assert(reddit.determine_subreddits(q_rd) == "Animewallpaper");
+        q_rd.allow_nsfw = true;
+        assert(reddit.determine_subreddits(q_rd) == "Animewallpaper+ecchi");
+
+        q_rd.categories = "100"; // General
+        q_rd.keywords = "space nebula";
+        assert(reddit.determine_subreddits(q_rd) == "spaceporn");
+        std::cout << "  - Mapeo inteligente de categorías a subreddits y filtro NSFW: OK.\n";
+
+        // Construcción de URL con flag include_over_18
+        std::string rd_url_sfw = reddit.build_search_url(q_rd);
+        assert(rd_url_sfw.find("include_over_18=on") != std::string::npos);
+        q_rd.allow_nsfw = false;
+        std::string rd_url_nsfw = reddit.build_search_url(q_rd);
+        assert(rd_url_nsfw.find("include_over_18=off") != std::string::npos);
+        std::cout << "  - Parámetros de consulta y seguridad de Reddit: OK.\n";
+
+        // Parseo de JSON de Reddit (filtrado estricto SFW vs NSFW)
+        std::string mock_reddit_json = R"({
+            "kind": "Listing",
+            "data": {
+                "after": "t3_token123",
+                "children": [
+                    {
+                        "data": {
+                            "id": "sfw_post",
+                            "title": "Minimalist Forest [3840x2160]",
+                            "url": "https://i.redd.it/sfw.jpg",
+                            "post_hint": "image",
+                            "over_18": false,
+                            "preview": {
+                                "images": [{
+                                    "source": { "width": 3840, "height": 2160, "url": "https://preview.redd.it/sfw.jpg?s=1" },
+                                    "resolutions": [{ "width": 320, "height": 180, "url": "https://preview.redd.it/sfw_thumb.jpg?s=1" }]
+                                }]
+                            }
+                        }
+                    },
+                    {
+                        "data": {
+                            "id": "nsfw_post",
+                            "title": "Ecchi Art [1920x1080]",
+                            "url": "https://i.redd.it/nsfw.jpg",
+                            "post_hint": "image",
+                            "over_18": true
+                        }
+                    },
+                    {
+                        "data": {
+                            "id": "text_post",
+                            "title": "Self text without image",
+                            "url": "https://reddit.com/r/wallpaper/comments/1",
+                            "over_18": false
+                        }
+                    }
+                ]
+            }
+        })";
+
+        std::string after_token;
+        auto sfw_items = reddit.parse_listing_json(mock_reddit_json, false, &after_token);
+        assert(sfw_items.size() == 1);
+        assert(sfw_items[0].id == "reddit_sfw_post");
+        assert(sfw_items[0].width == 3840);
+        assert(sfw_items[0].height == 2160);
+        assert(after_token == "t3_token123");
+
+        auto all_items = reddit.parse_listing_json(mock_reddit_json, true, &after_token);
+        assert(all_items.size() == 2);
+        assert(all_items[1].id == "reddit_nsfw_post");
+        std::cout << "  - Parseo y discriminación NSFW de Reddit: OK.\n";
+
+        // 10.2 UnsplashProvider
+        wallpaper::UnsplashProvider unsplash;
+        assert(unsplash.get_name() == "Unsplash");
+        assert(wallpaper::UnsplashProvider::map_color_to_param("", "neutral") == "black_and_white");
+        assert(wallpaper::UnsplashProvider::map_color_to_param("ff0000", "") == "red");
+        assert(wallpaper::UnsplashProvider::map_color_to_param("0066cc", "") == "blue");
+
+        std::string mock_unsplash = R"({
+            "results": [
+                {
+                    "id": "un123",
+                    "width": 3840,
+                    "height": 2160,
+                    "color": "#112233",
+                    "urls": {
+                        "raw": "https://images.unsplash.com/raw_photo",
+                        "small": "https://images.unsplash.com/small_photo"
+                    },
+                    "tags": [{ "title": "mountains" }]
+                }
+            ]
+        })";
+        auto un_items = unsplash.parse_search_json(mock_unsplash);
+        assert(un_items.size() == 1);
+        assert(un_items[0].id == "unsplash_un123");
+        assert(un_items[0].width == 3840);
+        assert(un_items[0].colors.size() == 1 && un_items[0].colors[0] == "112233");
+        std::cout << "  - Mapeo y parseo de Unsplash: OK.\n";
+
+        // 10.3 PexelsProvider
+        wallpaper::PexelsProvider pexels;
+        assert(pexels.get_name() == "Pexels");
+        assert(wallpaper::PexelsProvider::map_color_to_param("", "neutral") == "gray");
+        assert(wallpaper::PexelsProvider::map_color_to_param("0066cc", "") == "blue");
+
+        std::string mock_pexels = R"({
+            "photos": [
+                {
+                    "id": 98765,
+                    "width": 3840,
+                    "height": 2160,
+                    "avg_color": "#223344",
+                    "src": {
+                        "original": "https://images.pexels.com/orig.jpg",
+                        "medium": "https://images.pexels.com/med.jpg"
+                    },
+                    "alt": "Dramatic Sunset"
+                }
+            ]
+        })";
+        auto px_items = pexels.parse_search_json(mock_pexels);
+        assert(px_items.size() == 1);
+        assert(px_items[0].id == "pexels_98765");
+        assert(px_items[0].width == 3840);
+        assert(px_items[0].tags[0] == "Dramatic Sunset");
+        std::cout << "  - Mapeo y parseo de Pexels: OK.\n";
+
+        // 10.4 AggregateProvider y Filtro Local de Resolución
+        wallpaper::AggregateProvider agg;
+        assert(agg.get_name() == "MultiFuente");
+        agg.set_source(wallpaper::WallpaperSource::REDDIT);
+        assert(agg.get_name() == "Reddit");
+        agg.set_source(wallpaper::WallpaperSource::WALLHAVEN);
+        assert(agg.get_name() == "Wallhaven");
+        agg.set_source(wallpaper::WallpaperSource::ALL);
+        assert(agg.get_name() == "MultiFuente");
+
+        // Validación de resolución unificada
+        wallpaper::WallpaperItem item_4k; item_4k.width = 3840; item_4k.height = 2160;
+        wallpaper::WallpaperItem item_1080p; item_1080p.width = 1920; item_1080p.height = 1080;
+        wallpaper::WallpaperItem item_uw; item_uw.width = 3440; item_uw.height = 1440;
+
+        assert(wallpaper::AggregateProvider::satisfies_resolution(item_4k, wallpaper::ResolutionFilter::UHD_4K, ""));
+        assert(wallpaper::AggregateProvider::satisfies_resolution(item_4k, wallpaper::ResolutionFilter::FHD_1080P, ""));
+        assert(!wallpaper::AggregateProvider::satisfies_resolution(item_1080p, wallpaper::ResolutionFilter::UHD_4K, ""));
+        assert(wallpaper::AggregateProvider::satisfies_resolution(item_uw, wallpaper::ResolutionFilter::ULTRAWIDE_21_9, ""));
+        assert(!wallpaper::AggregateProvider::satisfies_resolution(item_1080p, wallpaper::ResolutionFilter::ULTRAWIDE_21_9, ""));
+        std::cout << "  - Capa de validación unificada de resolución: OK.\n";
+    }
+    std::cout << "  [OK] Proveedores multi-fuente verificados exitosamente.\n\n";
 
     std::cout << "============================================================\n";
     std::cout << " ¡TODAS LAS PRUEBAS BASE, RED Y FONDOS PASARON CON ÉXITO!\n";
