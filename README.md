@@ -1,4 +1,4 @@
-# WallFinder 🌌
+# WallFinder
 
 <p align="center">
   <img src="assets/wallfinder.png" alt="WallFinder Logo" width="140" height="140" />
@@ -9,35 +9,28 @@
   Optimizado nativamente para <b>KDE Plasma 6</b>, <b>GNOME</b>, <b>XFCE</b>, <b>Hyprland</b>, <b>Sway</b> y entornos X11 / Wayland.
 </p>
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Versi%C3%B3n-1.0.0-blue?style=flat-square" alt="Versión">
-  <img src="https://img.shields.io/badge/C%2B%2B-20-00599C?style=flat-square&logo=c%2B%2B" alt="C++20">
-  <img src="https://img.shields.io/badge/Interfaz-Dear%20ImGui-orange?style=flat-square" alt="Dear ImGui">
-  <img src="https://img.shields.io/badge/Licencia-MIT-green?style=flat-square" alt="Licencia">
-</p>
-
 ---
 
-## 🚀 Características Principales
+## Características Principales
 
-- 🔍 **Búsqueda Avanzada**: Conexión directa y fluida con el catálogo de Wallhaven.
-- 🎨 **Filtro Cromático Inteligente**:
+- **Búsqueda Avanzada**: Conexión directa y fluida con el catálogo de Wallhaven.
+- **Filtro Cromático Inteligente**:
   - Detección perceptual mediante el algoritmo **CIEDE2000**.
   - Modo bicolor y filtros por temperatura de color (cálidos, fríos y monocromo estricto).
   - Tolerancias estrictas para evitar falsos positivos cromáticos.
-- 🖥️ **Integración Nativa con el Escritorio**:
+- **Integración Nativa con el Escritorio**:
   - Aplica fondos instantáneamente en tu entorno con un solo clic.
   - **Soporte KDE Plasma 6**: Registra los fondos automáticamente como paquetes nativos del sistema en `~/.local/share/wallpapers/` con miniaturas reales, evitando duplicados en el selector de KDE.
   - Compatible con GNOME (`gsettings`), XFCE, Hyprland (`swww`), Sway (`swaybg`) y gestores X11 (`feh`).
-- ⚡ **Rendimiento Ultrarrápido**:
+- **Rendimiento**:
   - Desarrollado en **C++20** con aceleración por hardware (OpenGL 3.3).
   - Decodificación y carga de imágenes multihilo con `ThreadPool` asíncrono y caché en memoria.
-  - Interfaz suave a 60 FPS con animaciones fluidas y culling visual.
-- 🔄 **Comprobación Automática de Actualizaciones**: Escanea las nuevas versiones publicadas en GitHub directamente al iniciar.
+  - Interfaz a 60 FPS con animaciones fluidas y culling visual.
+- **Comprobación Automática de Actualizaciones**: Escanea las nuevas versiones publicadas en GitHub directamente al iniciar.
 
 ---
 
-## 📦 Requisitos del Sistema
+## Requisitos del Sistema
 
 ### Dependencias de compilación y librerías
 Para compilar WallFinder en cualquier distribución Linux, asegúrate de tener instalados los siguientes paquetes:
@@ -61,7 +54,7 @@ sudo dnf install gcc-c++ cmake libcurl-devel glfw-devel nlohmann-json-devel mesa
 
 ---
 
-## 🛠️ Instalación y Compilación
+## Instalación y Compilación
 
 ### 1. Clonar el repositorio
 ```bash
@@ -94,13 +87,12 @@ cmake --build . -j$(nproc)
 
 ---
 
-## 🖥️ Integración en el Menú de Aplicaciones (KDE / GNOME)
+## Integración en el Menú de Aplicaciones (KDE / GNOME)
 
 Para que WallFinder aparezca en tu menú de inicio (Kickoff de KDE, KRunner, GNOME Dash, etc.) con su ícono oficial:
 
-1. Ejecuta el script instalador del lanzador o copia el acceso directo:
 ```bash
-# Crear directorio si no existe
+# Crear directorios si no existen
 mkdir -p ~/.local/share/applications ~/.local/share/icons/hicolor/512x512/apps
 
 # Copiar el archivo de escritorio y el icono
@@ -114,7 +106,7 @@ kbuildsycoca6 --noincremental # (Si estás en KDE Plasma)
 
 ---
 
-## 🧪 Pruebas del Sistema
+## Pruebas del Sistema
 
 WallFinder incluye una suite integral de pruebas unitarias que verifica la concurrencia, el cliente de red, la detección del entorno de escritorio, el análisis de color CIEDE2000 y el escáner de versiones:
 
@@ -124,6 +116,6 @@ WallFinder incluye una suite integral de pruebas unitarias que verifica la concu
 
 ---
 
-## 📜 Licencia
+## Licencia
 
-Distribuido bajo la licencia MIT. Consulta el archivo `LICENSE` o el código fuente para más detalles.
+Distribuido bajo la licencia MIT.
