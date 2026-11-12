@@ -56,16 +56,8 @@ std::string WallhavenProvider::build_search_url(const SearchQuery& query) const 
         params.push_back("categories=" + HttpClient::url_encode(query.categories));
     }
 
-    std::string purity_str = query.purity;
-    if (query.allow_nsfw) {
-        if (!api_key_.empty()) {
-            purity_str = "111"; // Todo el catálogo (SFW + Sketchy + NSFW con API Key)
-        } else {
-            purity_str = "110"; // SFW + Sketchy (permitido públicamente sin API Key)
-        }
-    }
-    if (!purity_str.empty()) {
-        params.push_back("purity=" + HttpClient::url_encode(purity_str));
+    if (!query.purity.empty()) {
+        params.push_back("purity=" + HttpClient::url_encode(query.purity));
     }
 
     if (!api_key_.empty()) {

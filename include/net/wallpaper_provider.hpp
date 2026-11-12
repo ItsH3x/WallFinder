@@ -17,14 +17,13 @@ struct SearchQuery {
     std::string custom_resolution;
     std::string ratio;                  // "16x9", "21x9", etc.
     std::string categories = "111";     // General, Anime, People (binary flags)
-    std::string purity = "100";         // SFW, Sketchy, NSFW (binary flags)
+    std::string purity = "100";         // Pureza Wallhaven ("100" = solo SFW)
     std::string sorting = "toplist";    // "toplist", "views", "date_added", "favorites", "relevance"
     std::string color;                  // Hex sin '#' (ej. "cc0000", "0066cc")
     std::string color_secondary;        // Segundo color para combinación bicolor
     bool combine_colors = false;        // true: busca ambos colores en el mismo fondo
     std::string color_temperature;      // "warm", "cool", "neutral", o vacío
     int page = 1;
-    bool allow_nsfw = false;            // Permite contenido para adultos / NSFW (+18)
 };
 
 // Resultado paginado: el proveedor puede consumir varias páginas de la API remota

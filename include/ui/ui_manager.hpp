@@ -65,7 +65,6 @@ private:
     char search_text_[256]{};
     int selected_resolution_idx_{0};
     char custom_resolution_[64]{"1920x1080"};
-    bool allow_nsfw_{false};
 
     // Categorías (inactivas por defecto; si ninguna está activa se busca en General)
     bool cat_anime_{false};
@@ -103,7 +102,6 @@ private:
 
     [[nodiscard]] int get_active_filter_count() const noexcept {
         int count = 0;
-        if (allow_nsfw_) ++count;
         if (selected_resolution_idx_ != 0) ++count;
         if (selected_sort_idx_ != 0) ++count;
         if (cat_anime_) ++count;

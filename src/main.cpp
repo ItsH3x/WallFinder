@@ -897,21 +897,16 @@ int main() {
         assert(cool_res.size() == 1 && cool_res[0].id == "cool");
         std::cout << "  - Filtrado por ambiente de temperatura (Cálidos / Fríos): OK.\n";
 
-        // 10.4 Filtro NSFW (+18) y flags de pureza en Wallhaven
-        wallpaper::SearchQuery nsfw_q;
-        nsfw_q.allow_nsfw = false;
-        std::string sfw_url = provider.build_search_url(nsfw_q);
+        // 10.4 Verificación de URL de Wallhaven (pureza SFW y apikey opcional)
+        wallpaper::SearchQuery sfw_q;
+        std::string sfw_url = provider.build_search_url(sfw_q);
         assert(sfw_url.find("purity=100") != std::string::npos);
 
-        nsfw_q.allow_nsfw = true;
-        std::string nsfw_url_no_key = provider.build_search_url(nsfw_q);
-        assert(nsfw_url_no_key.find("purity=110") != std::string::npos);
-
         provider.set_api_key("test_key_123");
-        std::string nsfw_url_with_key = provider.build_search_url(nsfw_q);
-        assert(nsfw_url_with_key.find("purity=111") != std::string::npos);
-        assert(nsfw_url_with_key.find("apikey=test_key_123") != std::string::npos);
-        std::cout << "  - Seguridad y filtro NSFW (+18) en Wallhaven (SFW: 100, Sketchy: 110, NSFW: 111): OK.\n";
+        std::string key_url = provider.build_search_url(sfw_q);
+        assert(key_url.find("purity=100") != std::string::npos);
+        assert(key_url.find("apikey=test_key_123") != std::string::npos);
+        std::cout << "  - Parámetros de pureza SFW (100) y API Key opcional en Wallhaven: OK.\n";
     }
     std::cout << "  [OK] Nueva arquitectura de color y filtros de Wallhaven verificada exitosamente.\n\n";
 

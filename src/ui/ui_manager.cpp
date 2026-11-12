@@ -564,9 +564,7 @@ SearchQuery UIManager::build_query(int page) const {
         full_keywords += tag;
     }
     query.keywords = full_keywords;
-
-    query.allow_nsfw = allow_nsfw_;
-    query.purity = allow_nsfw_ ? "111" : "100";
+    query.purity = "100";
 
     switch (selected_resolution_idx_) {
         case 1: query.resolution = ResolutionFilter::FHD_1080P; break;
@@ -629,7 +627,6 @@ SearchQuery UIManager::build_query(int page) const {
 }
 
 void UIManager::reset_filters() {
-    allow_nsfw_ = false;
     selected_resolution_idx_ = 0;
     cat_anime_ = false;
     cat_people_ = false;
@@ -1223,23 +1220,8 @@ void UIManager::render_filters_panel() {
             dl->AddText(ImVec2(x, std::round(p.y + (header_h - ssz.y) * 0.5f)), active_filters ? kAccentHover : kTextSubtle, sub.c_str());
         }
 
-        float nsfw_w = 112.0f;
-        float reset_w = 120.0f;
-        float gap_btn = 8.0f;
-        float total_right = reset_w + gap_btn + nsfw_w;
-        ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x - total_right);
-
-        // Botón NSFW (+18) con advertencia visual
-        if (theme::PillToggle("##FilterNSFW", icons::DrawAlert, "NSFW (+18)", allow_nsfw_, nsfw_w, header_h,
-                              allow_nsfw_ ? IM_COL32(239, 68, 68, 255) : 0)) {
-            allow_nsfw_ = !allow_nsfw_;
-            trigger_search(true, false);
-        }
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Permitir contenido explícito / para adultos (+18) en Reddit y Wallhaven");
-        }
-
-        ImGui::SameLine(0.0f, gap_btn);
+        float reset_w = 124.0f;
+        ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x - reset_w);
         if (theme::Button("##ResetFilters", icons::DrawReset, "Restablecer", ImVec2(reset_w, header_h),
                           ButtonKind::Ghost, active_filters > 0)) {
             reset_filters();
