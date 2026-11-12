@@ -66,9 +66,10 @@ private:
     int selected_resolution_idx_{0};
     char custom_resolution_[64]{"1920x1080"};
 
-    // Categorías (inactivas por defecto; si ninguna está activa se busca en General)
-    bool cat_anime_{false};
-    bool cat_people_{false};
+    // Categorías base y temáticas
+    bool cat_general_{true};
+    bool cat_anime_{true};
+    bool cat_people_{true};
     bool cat_nature_{false};
     bool cat_gaming_{false};
     bool cat_cyberpunk_{false};
@@ -117,18 +118,10 @@ private:
         int count = 0;
         if (selected_resolution_idx_ != 0) ++count;
         if (selected_sort_idx_ != 0) ++count;
-        if (cat_anime_) ++count;
-        if (cat_people_) ++count;
-        if (cat_nature_) ++count;
-        if (cat_gaming_) ++count;
-        if (cat_cyberpunk_) ++count;
-        if (cat_digital_art_) ++count;
-        if (cat_space_) ++count;
-        if (cat_vehicles_) ++count;
-        if (cat_fantasy_) ++count;
-        if (cat_minimalism_) ++count;
-        if (cat_animals_) ++count;
-        if (cat_architecture_) ++count;
+        if (!cat_general_ || !cat_anime_ || !cat_people_) ++count;
+        if (cat_nature_ || cat_gaming_ || cat_cyberpunk_ || cat_digital_art_ ||
+            cat_space_ || cat_vehicles_ || cat_fantasy_ || cat_minimalism_ ||
+            cat_animals_ || cat_architecture_) ++count;
         if (selected_temp_idx_ != 0) ++count;
         if (selected_color_1_idx_ != 0) ++count;
         if (combine_colors_ && selected_color_2_idx_ != 0) ++count;

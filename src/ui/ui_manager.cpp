@@ -675,25 +675,13 @@ SearchQuery UIManager::build_query(int page) const {
     }
 
     // Categorías de Wallhaven: General (100), Anime (010), Personas (001)
-    // Cuando ninguna categoría está seleccionada, el comportamiento por defecto es buscar en el catálogo general ("111").
-    bool has_any_cat = (cat_anime_ || cat_people_ || cat_nature_ || cat_gaming_ || 
-                        cat_cyberpunk_ || cat_digital_art_ || cat_space_ || cat_vehicles_ ||
-                        cat_fantasy_ || cat_minimalism_ || cat_animals_ || cat_architecture_);
-    if (!has_any_cat) {
-        query.categories = "111"; // Catálogo general completo por defecto
-    } else {
-        bool need_general = (cat_nature_ || cat_gaming_ || cat_cyberpunk_ || 
-                             cat_digital_art_ || cat_space_ || cat_vehicles_ ||
-                             cat_fantasy_ || cat_minimalism_ || cat_animals_ || cat_architecture_);
-        bool need_anime = cat_anime_;
-        bool need_people = cat_people_;
-
-        std::string cats;
-        cats += (need_general ? '1' : '0');
-        cats += (need_anime ? '1' : '0');
-        cats += (need_people ? '1' : '0');
-        query.categories = cats;
-    }
+    // Se construyen directamente a partir de cat_general_, cat_anime_, cat_people_.
+    std::string cats;
+    cats += (cat_general_ ? '1' : '0');
+    cats += (cat_anime_ ? '1' : '0');
+    cats += (cat_people_ ? '1' : '0');
+    if (cats == "000") cats = "111"; // Red de seguridad si desmarcó las 3
+    query.categories = cats;
 
     // Ordenación inteligente:
     // Si selected_sort_idx_ == 0 ("Más populares"):
@@ -740,8 +728,9 @@ SearchQuery UIManager::build_query(int page) const {
 
 void UIManager::reset_filters() {
     selected_resolution_idx_ = 0;
-    cat_anime_ = false;
-    cat_people_ = false;
+    cat_general_ = true;
+    cat_anime_ = true;
+    cat_people_ = true;
     clear_thematic_categories();
     selected_sort_idx_ = 0;
     selected_temp_idx_ = 0;
@@ -1215,6 +1204,10 @@ void UIManager::render_top_bar() {
             ImGui::SetCursorScreenPos(cpos);
             if (ImGui::InvisibleButton("##ClearSearch", ImVec2(cs, cs))) {
                 search_text_[0] = '\0';
+                clear_thematic_categories();
+                cat_general_ = true;
+                cat_anime_ = true;
+                cat_people_ = true;
                 trigger_search(true, true);
             }
             bool ch = ImGui::IsItemHovered();
@@ -1236,6 +1229,10 @@ void UIManager::render_top_bar() {
     bool btn_search = theme::Button("##SearchBtn", icons::DrawSearch, "Buscar",
                                     ImVec2(search_btn_w, bar_h), ButtonKind::Primary);
     if (enter_pressed || btn_search) {
+        clear_thematic_categories();
+        cat_general_ = true;
+        cat_anime_ = true;
+        cat_people_ = true;
         trigger_search(true, true);
     }
 
@@ -1417,55 +1414,73 @@ void UIManager::render_filters_panel() {
     };
 
     auto render_section_categories = [&]() {
-        SectionLabel("CATEGORÍAS");
-        struct Cat {
+        SectionLabel("TIPO DE CONTENIDO");
+        struct BaseCat {
             const char* id;
             const char* label;
             IconFn icon;
             bool* v;
             const char* tip;
-            bool is_thematic;
         };
-        Cat cats[12] = {
-            { "##cat_a", "Anime",        icons::DrawAnime,        &cat_anime_,        "Anime, manga e ilustración japonesa", false },
-            { "##cat_p", "Personas",     icons::DrawUser,         &cat_people_,       "Retratos, modelos y fotografía de personas", false },
-            { "##cat_m", "Paisajes",     icons::DrawMountain,     &cat_nature_,       "Naturaleza, montañas, bosques y vistas panorámicas", true },
-            { "##cat_g", "Videojuegos",  icons::DrawGamepad,      &cat_gaming_,       "Gaming, consolas, personajes y captura de juegos", true },
-            { "##cat_c", "Cyberpunk",    icons::DrawBolt,         &cat_cyberpunk_,    "Sci-Fi, ciudades neón, futurismo y estética cyberpunk", true },
-            { "##cat_d", "Arte Digital", icons::DrawPalette,      &cat_digital_art_,  "Concept art, renders 3D e ilustraciones digitales", true },
-            { "##cat_s", "Espacio",      icons::DrawSpace,        &cat_space_,        "Cosmos, galaxias, nebulosas, planetas y astronomía", true },
-            { "##cat_v", "Vehículos",    icons::DrawVehicles,     &cat_vehicles_,     "Autos, supercars, motocicletas, aviones y transporte", true },
-            { "##cat_f", "Fantasía",     icons::DrawFantasy,      &cat_fantasy_,      "Magia, reinos fantásticos, mitología y castillos", true },
-            { "##cat_mn","Minimalista",  icons::DrawMinimalism,   &cat_minimalism_,   "Composiciones limpias, formas simples y elegancia sutil", true },
-            { "##cat_an","Animales",     icons::DrawAnimals,      &cat_animals_,      "Fauna silvestre, mascotas, aves y vida salvaje", true },
-            { "##cat_ar","Arquitectura", icons::DrawArchitecture, &cat_architecture_, "Ciudades, rascacielos, metrópolis y diseño urbano", true }
+        BaseCat base_cats[3] = {
+            { "##cat_gen", "General",  icons::DrawSparkle, &cat_general_, "Arte digital, paisajes, objetos y catálogo general" },
+            { "##cat_ani", "Anime",    icons::DrawAnime,   &cat_anime_,   "Anime, manga e ilustración japonesa" },
+            { "##cat_peo", "Personas", icons::DrawUser,    &cat_people_,  "Retratos, modelos y fotografía de personas" }
         };
 
         const float g = 6.0f;
         float avail = ImGui::GetContentRegionAvail().x;
+        int cols_base = 3;
+        float w_base = std::min(116.0f, std::floor((avail - (cols_base - 1) * g) / cols_base));
+        for (int i = 0; i < 3; ++i) {
+            if (i > 0) ImGui::SameLine(0.0f, g);
+            if (PillToggle(base_cats[i].id, base_cats[i].icon, base_cats[i].label, *base_cats[i].v, w_base, 25.0f)) {
+                *base_cats[i].v = !*base_cats[i].v;
+                trigger_search(true, false);
+            }
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", base_cats[i].tip);
+        }
+
+        ImGui::Dummy(ImVec2(0.0f, 6.0f));
+        SectionLabel("TEMÁTICA");
+        struct ThematicCat {
+            const char* id;
+            const char* label;
+            IconFn icon;
+            bool* v;
+            const char* tip;
+        };
+        ThematicCat thematic_cats[10] = {
+            { "##cat_m",  "Paisajes",     icons::DrawMountain,     &cat_nature_,       "Naturaleza, montañas, bosques y vistas panorámicas" },
+            { "##cat_g",  "Videojuegos",  icons::DrawGamepad,      &cat_gaming_,       "Gaming, consolas, personajes y captura de juegos" },
+            { "##cat_c",  "Cyberpunk",    icons::DrawBolt,         &cat_cyberpunk_,    "Sci-Fi, ciudades neón, futurismo y estética cyberpunk" },
+            { "##cat_d",  "Arte Digital", icons::DrawPalette,      &cat_digital_art_,  "Concept art, renders 3D e ilustraciones digitales" },
+            { "##cat_s",  "Espacio",      icons::DrawSpace,        &cat_space_,        "Cosmos, galaxias, nebulosas, planetas y astronomía" },
+            { "##cat_v",  "Vehículos",    icons::DrawVehicles,     &cat_vehicles_,     "Autos, supercars, motocicletas, aviones y transporte" },
+            { "##cat_f",  "Fantasía",     icons::DrawFantasy,      &cat_fantasy_,      "Magia, reinos fantásticos, mitología y castillos" },
+            { "##cat_mn", "Minimalista",  icons::DrawMinimalism,   &cat_minimalism_,   "Composiciones limpias, formas simples y elegancia sutil" },
+            { "##cat_an", "Animales",     icons::DrawAnimals,      &cat_animals_,      "Fauna silvestre, mascotas, aves y vida salvaje" },
+            { "##cat_ar", "Arquitectura", icons::DrawArchitecture, &cat_architecture_, "Ciudades, rascacielos, metrópolis y diseño urbano" }
+        };
+
         int cols = std::clamp(static_cast<int>((avail + g) / (108.0f + g)), 2, 4);
         float w = std::min(116.0f, std::floor((avail - (cols - 1) * g) / cols));
-        for (int i = 0; i < 12; ++i) {
+        for (int i = 0; i < 10; ++i) {
             if (i % cols != 0) {
                 ImGui::SameLine(0.0f, g);
             } else if (i > 0) {
                 ImGui::Dummy(ImVec2(0.0f, g - ImGui::GetStyle().ItemSpacing.y));
             }
 
-            // Cada categoría tiene su propio icono vectorial y NINGUNA palomita
-            if (PillToggle(cats[i].id, cats[i].icon, cats[i].label, *cats[i].v, w, 25.0f)) {
-                if (cats[i].is_thematic) {
-                    bool was_active = *cats[i].v;
-                    clear_thematic_categories();
-                    if (!was_active) {
-                        *cats[i].v = true;
-                    }
-                } else {
-                    *cats[i].v = !*cats[i].v;
+            if (PillToggle(thematic_cats[i].id, thematic_cats[i].icon, thematic_cats[i].label, *thematic_cats[i].v, w, 25.0f)) {
+                bool was_active = *thematic_cats[i].v;
+                clear_thematic_categories();
+                if (!was_active) {
+                    *thematic_cats[i].v = true;
                 }
                 trigger_search(true, false);
             }
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", cats[i].tip);
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", thematic_cats[i].tip);
         }
     };
 
