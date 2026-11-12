@@ -51,10 +51,6 @@ add_library(wallpaper_core STATIC
     src/app/config.cpp
     src/net/http_client.cpp
     src/net/wallhaven_provider.cpp
-    src/net/reddit_provider.cpp
-    src/net/unsplash_provider.cpp
-    src/net/pexels_provider.cpp
-    src/net/aggregate_provider.cpp
     src/core/texture_cache.cpp
     src/core/wallpaper_setter.cpp
 )

@@ -40,11 +40,15 @@ public:
     [[nodiscard]] std::vector<WallpaperItem> parse_search_json(const std::string& json_str) const;
     [[nodiscard]] std::optional<WallpaperItem> parse_details_json(const std::string& json_str) const;
 
+    void set_api_key(const std::string& key) { api_key_ = key; }
+    [[nodiscard]] const std::string& get_api_key() const { return api_key_; }
+
     [[nodiscard]] HttpClient& get_http_client() { return *http_client_; }
     [[nodiscard]] const HttpClient& get_http_client() const { return *http_client_; }
 
 private:
     std::shared_ptr<HttpClient> http_client_;
+    std::string api_key_;
     mutable std::mutex rate_limit_mutex_;
     std::chrono::steady_clock::time_point rate_limited_until_{};
     std::chrono::steady_clock::time_point last_request_time_{};

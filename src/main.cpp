@@ -6,10 +6,6 @@
 #include "core/wallpaper_setter.hpp"
 #include "net/http_client.hpp"
 #include "net/wallhaven_provider.hpp"
-#include "net/reddit_provider.hpp"
-#include "net/unsplash_provider.hpp"
-#include "net/pexels_provider.hpp"
-#include "net/aggregate_provider.hpp"
 #include "net/version_checker.hpp"
 
 #include <curl/curl.h>
@@ -834,175 +830,90 @@ int main() {
     std::cout << "  [OK] Escáner de versiones verificado exitosamente.\n\n";
 
     // -------------------------------------------------------------------------
-    // 10. Verificación de Proveedores Multi-Fuente (Reddit, Unsplash, Pexels, Aggregate)
+    // 10. Verificación de Arquitectura de Color y Modo Bicolor en Wallhaven
     // -------------------------------------------------------------------------
-    std::cout << "[10/10] Verificando Proveedores Multi-Fuente y Filtros Unificados...\n";
+    std::cout << "[10/10] Verificando Filtro Sensible de Wallhaven y Modo Bicolor Reforzado...\n";
     {
-        // 10.1 RedditProvider
-        wallpaper::RedditProvider reddit;
-        assert(reddit.get_name() == "Reddit");
+        wallpaper::WallhavenProvider provider;
 
-        // Desescape de URLs de Reddit (&amp; -> &)
-        std::string raw_url = "https://preview.redd.it/test.png?width=640&amp;s=abc123xyz";
-        assert(wallpaper::RedditProvider::unescape_url(raw_url) == "https://preview.redd.it/test.png?width=640&s=abc123xyz");
-        std::cout << "  - Reddit URL unescape (&amp; -> &): OK.\n";
+        // 10.1 Modo Monocolor: la API de Wallhaven filtra en servidor; no hay descarte local
+        wallpaper::SearchQuery mono_q;
+        mono_q.color = "cc0000"; // Rojo
+        assert(!wallpaper::WallhavenProvider::needs_local_color_filter(mono_q));
 
-        // Mapeo inteligente de subreddits y soporte NSFW
-        wallpaper::SearchQuery q_rd;
-        q_rd.categories = "010"; // Anime
-        q_rd.allow_nsfw = false;
-        assert(reddit.determine_subreddits(q_rd) == "Animewallpaper");
-        q_rd.allow_nsfw = true;
-        assert(reddit.determine_subreddits(q_rd) == "Animewallpaper+ecchi");
+        std::vector<wallpaper::WallpaperItem> mono_items;
+        wallpaper::WallpaperItem mi1; mi1.id = "m1"; mi1.colors = { "#cc0000", "#111111" };
+        wallpaper::WallpaperItem mi2; mi2.id = "m2"; mi2.colors = { "#ff2222", "#ffffff" };
+        mono_items.push_back(mi1);
+        mono_items.push_back(mi2);
 
-        q_rd.categories = "100"; // General
-        q_rd.keywords = "space nebula";
-        assert(reddit.determine_subreddits(q_rd) == "spaceporn");
-        std::cout << "  - Mapeo inteligente de categorías a subreddits y filtro NSFW: OK.\n";
+        auto mono_res = wallpaper::WallhavenProvider::apply_color_filters(mono_items, mono_q);
+        assert(mono_res.size() == 2);
+        std::cout << "  - Modo Monocolor sensible (sin descarte artificial de resultados): OK.\n";
 
-        // Construcción de URL con flag include_over_18
-        std::string rd_url_sfw = reddit.build_search_url(q_rd);
-        assert(rd_url_sfw.find("include_over_18=on") != std::string::npos);
-        q_rd.allow_nsfw = false;
-        std::string rd_url_nsfw = reddit.build_search_url(q_rd);
-        assert(rd_url_nsfw.find("include_over_18=off") != std::string::npos);
-        std::cout << "  - Parámetros de consulta y seguridad de Reddit: OK.\n";
+        // 10.2 Modo Bicolor: Wallhaven consulta Color 1; WallFinder refuerza encontrar Color 2 (acento)
+        wallpaper::SearchQuery dual_q;
+        dual_q.color = "cc0000";           // Color 1: Rojo
+        dual_q.color_secondary = "ffff00"; // Color 2: Amarillo
+        dual_q.combine_colors = true;
+        assert(wallpaper::WallhavenProvider::needs_local_color_filter(dual_q));
 
-        // Parseo de JSON de Reddit (filtrado estricto SFW vs NSFW)
-        std::string mock_reddit_json = R"({
-            "kind": "Listing",
-            "data": {
-                "after": "t3_token123",
-                "children": [
-                    {
-                        "data": {
-                            "id": "sfw_post",
-                            "title": "Minimalist Forest [3840x2160]",
-                            "url": "https://i.redd.it/sfw.jpg",
-                            "post_hint": "image",
-                            "over_18": false,
-                            "preview": {
-                                "images": [{
-                                    "source": { "width": 3840, "height": 2160, "url": "https://preview.redd.it/sfw.jpg?s=1" },
-                                    "resolutions": [{ "width": 320, "height": 180, "url": "https://preview.redd.it/sfw_thumb.jpg?s=1" }]
-                                }]
-                            }
-                        }
-                    },
-                    {
-                        "data": {
-                            "id": "nsfw_post",
-                            "title": "Ecchi Art [1920x1080]",
-                            "url": "https://i.redd.it/nsfw.jpg",
-                            "post_hint": "image",
-                            "over_18": true
-                        }
-                    },
-                    {
-                        "data": {
-                            "id": "text_post",
-                            "title": "Self text without image",
-                            "url": "https://reddit.com/r/wallpaper/comments/1",
-                            "over_18": false
-                        }
-                    }
-                ]
-            }
-        })";
+        std::vector<wallpaper::WallpaperItem> dual_candidates;
+        // Candidato 1: tiene Rojo y Amarillo (debe aceptarse)
+        wallpaper::WallpaperItem d1; d1.id = "d1"; d1.colors = { "#cc0000", "#111111", "#ffff00" };
+        // Candidato 2: solo tiene Rojo y Azul (no tiene Amarillo, debe descartarse)
+        wallpaper::WallpaperItem d2; d2.id = "d2"; d2.colors = { "#cc0000", "#0066cc", "#222222" };
+        // Candidato 3: tiene Rojo y un tono dorado/amarillento claro (debe aceptarse)
+        wallpaper::WallpaperItem d3; d3.id = "d3"; d3.colors = { "#cc0000", "#ffee00" };
 
-        std::string after_token;
-        auto sfw_items = reddit.parse_listing_json(mock_reddit_json, false, &after_token);
-        assert(sfw_items.size() == 1);
-        assert(sfw_items[0].id == "reddit_sfw_post");
-        assert(sfw_items[0].width == 3840);
-        assert(sfw_items[0].height == 2160);
-        assert(after_token == "t3_token123");
+        dual_candidates.push_back(d1);
+        dual_candidates.push_back(d2);
+        dual_candidates.push_back(d3);
 
-        auto all_items = reddit.parse_listing_json(mock_reddit_json, true, &after_token);
-        assert(all_items.size() == 2);
-        assert(all_items[1].id == "reddit_nsfw_post");
-        std::cout << "  - Parseo y discriminación NSFW de Reddit: OK.\n";
+        auto dual_res = wallpaper::WallhavenProvider::apply_color_filters(dual_candidates, dual_q);
+        assert(dual_res.size() == 2);
+        assert(dual_res[0].id == "d1" || dual_res[0].id == "d3");
+        assert(dual_res[1].id == "d1" || dual_res[1].id == "d3");
+        std::cout << "  - Modo Bicolor reforzado (Color 1 garantizado por API + Color 2 verificado en paleta): OK.\n";
 
-        // 10.2 UnsplashProvider
-        wallpaper::UnsplashProvider unsplash;
-        assert(unsplash.get_name() == "Unsplash");
-        assert(wallpaper::UnsplashProvider::map_color_to_param("", "neutral") == "black_and_white");
-        assert(wallpaper::UnsplashProvider::map_color_to_param("ff0000", "") == "red");
-        assert(wallpaper::UnsplashProvider::map_color_to_param("0066cc", "") == "blue");
+        // 10.3 Temperatura cromática (cálidos / fríos)
+        wallpaper::SearchQuery warm_q;
+        warm_q.color_temperature = "warm";
+        assert(wallpaper::WallhavenProvider::needs_local_color_filter(warm_q));
 
-        std::string mock_unsplash = R"({
-            "results": [
-                {
-                    "id": "un123",
-                    "width": 3840,
-                    "height": 2160,
-                    "color": "#112233",
-                    "urls": {
-                        "raw": "https://images.unsplash.com/raw_photo",
-                        "small": "https://images.unsplash.com/small_photo"
-                    },
-                    "tags": [{ "title": "mountains" }]
-                }
-            ]
-        })";
-        auto un_items = unsplash.parse_search_json(mock_unsplash);
-        assert(un_items.size() == 1);
-        assert(un_items[0].id == "unsplash_un123");
-        assert(un_items[0].width == 3840);
-        assert(un_items[0].colors.size() == 1 && un_items[0].colors[0] == "112233");
-        std::cout << "  - Mapeo y parseo de Unsplash: OK.\n";
+        wallpaper::SearchQuery cool_q;
+        cool_q.color_temperature = "cool";
+        assert(wallpaper::WallhavenProvider::needs_local_color_filter(cool_q));
 
-        // 10.3 PexelsProvider
-        wallpaper::PexelsProvider pexels;
-        assert(pexels.get_name() == "Pexels");
-        assert(wallpaper::PexelsProvider::map_color_to_param("", "neutral") == "gray");
-        assert(wallpaper::PexelsProvider::map_color_to_param("0066cc", "") == "blue");
+        std::vector<wallpaper::WallpaperItem> temp_items;
+        wallpaper::WallpaperItem tw; tw.id = "warm"; tw.colors = { "#ff5500", "#cc0000" };
+        wallpaper::WallpaperItem tc; tc.id = "cool"; tc.colors = { "#0066cc", "#00ccff" };
+        temp_items.push_back(tw);
+        temp_items.push_back(tc);
 
-        std::string mock_pexels = R"({
-            "photos": [
-                {
-                    "id": 98765,
-                    "width": 3840,
-                    "height": 2160,
-                    "avg_color": "#223344",
-                    "src": {
-                        "original": "https://images.pexels.com/orig.jpg",
-                        "medium": "https://images.pexels.com/med.jpg"
-                    },
-                    "alt": "Dramatic Sunset"
-                }
-            ]
-        })";
-        auto px_items = pexels.parse_search_json(mock_pexels);
-        assert(px_items.size() == 1);
-        assert(px_items[0].id == "pexels_98765");
-        assert(px_items[0].width == 3840);
-        assert(px_items[0].tags[0] == "Dramatic Sunset");
-        std::cout << "  - Mapeo y parseo de Pexels: OK.\n";
+        auto warm_res = wallpaper::WallhavenProvider::apply_color_filters(temp_items, warm_q);
+        assert(warm_res.size() == 1 && warm_res[0].id == "warm");
+        auto cool_res = wallpaper::WallhavenProvider::apply_color_filters(temp_items, cool_q);
+        assert(cool_res.size() == 1 && cool_res[0].id == "cool");
+        std::cout << "  - Filtrado por ambiente de temperatura (Cálidos / Fríos): OK.\n";
 
-        // 10.4 AggregateProvider y Filtro Local de Resolución
-        wallpaper::AggregateProvider agg;
-        assert(agg.get_name() == "MultiFuente");
-        agg.set_source(wallpaper::WallpaperSource::REDDIT);
-        assert(agg.get_name() == "Reddit");
-        agg.set_source(wallpaper::WallpaperSource::WALLHAVEN);
-        assert(agg.get_name() == "Wallhaven");
-        agg.set_source(wallpaper::WallpaperSource::ALL);
-        assert(agg.get_name() == "MultiFuente");
+        // 10.4 Filtro NSFW (+18) y flags de pureza en Wallhaven
+        wallpaper::SearchQuery nsfw_q;
+        nsfw_q.allow_nsfw = false;
+        std::string sfw_url = provider.build_search_url(nsfw_q);
+        assert(sfw_url.find("purity=100") != std::string::npos);
 
-        // Validación de resolución unificada
-        wallpaper::WallpaperItem item_4k; item_4k.width = 3840; item_4k.height = 2160;
-        wallpaper::WallpaperItem item_1080p; item_1080p.width = 1920; item_1080p.height = 1080;
-        wallpaper::WallpaperItem item_uw; item_uw.width = 3440; item_uw.height = 1440;
+        nsfw_q.allow_nsfw = true;
+        std::string nsfw_url_no_key = provider.build_search_url(nsfw_q);
+        assert(nsfw_url_no_key.find("purity=110") != std::string::npos);
 
-        assert(wallpaper::AggregateProvider::satisfies_resolution(item_4k, wallpaper::ResolutionFilter::UHD_4K, ""));
-        assert(wallpaper::AggregateProvider::satisfies_resolution(item_4k, wallpaper::ResolutionFilter::FHD_1080P, ""));
-        assert(!wallpaper::AggregateProvider::satisfies_resolution(item_1080p, wallpaper::ResolutionFilter::UHD_4K, ""));
-        assert(wallpaper::AggregateProvider::satisfies_resolution(item_uw, wallpaper::ResolutionFilter::ULTRAWIDE_21_9, ""));
-        assert(!wallpaper::AggregateProvider::satisfies_resolution(item_1080p, wallpaper::ResolutionFilter::ULTRAWIDE_21_9, ""));
-        std::cout << "  - Capa de validación unificada de resolución: OK.\n";
+        provider.set_api_key("test_key_123");
+        std::string nsfw_url_with_key = provider.build_search_url(nsfw_q);
+        assert(nsfw_url_with_key.find("purity=111") != std::string::npos);
+        assert(nsfw_url_with_key.find("apikey=test_key_123") != std::string::npos);
+        std::cout << "  - Seguridad y filtro NSFW (+18) en Wallhaven (SFW: 100, Sketchy: 110, NSFW: 111): OK.\n";
     }
-    std::cout << "  [OK] Proveedores multi-fuente verificados exitosamente.\n\n";
+    std::cout << "  [OK] Nueva arquitectura de color y filtros de Wallhaven verificada exitosamente.\n\n";
 
     std::cout << "============================================================\n";
     std::cout << " ¡TODAS LAS PRUEBAS BASE, RED Y FONDOS PASARON CON ÉXITO!\n";

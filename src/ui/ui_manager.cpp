@@ -186,7 +186,7 @@ UIManager::UIManager()
     : wallpaper_setter_(Config::instance().get_desktop_environment()) {
     thread_pool_ = std::make_shared<ThreadPool>(4);
     texture_cache_ = std::make_unique<TextureCache>(thread_pool_);
-    provider_ = std::make_shared<AggregateProvider>(thread_pool_);
+    provider_ = std::make_shared<WallhavenProvider>();
 }
 
 UIManager::~UIManager() {
@@ -620,8 +620,8 @@ SearchQuery UIManager::build_query(int page) const {
         query.color = c2;
         query.color_temperature.clear();
     } else {
-        const char* temp_keys[] = { "", "warm", "cool", "neutral" };
-        if (selected_temp_idx_ > 0 && selected_temp_idx_ < 4) {
+        const char* temp_keys[] = { "", "warm", "cool" };
+        if (selected_temp_idx_ > 0 && selected_temp_idx_ < 3) {
             query.color_temperature = temp_keys[selected_temp_idx_];
         }
     }
@@ -629,7 +629,6 @@ SearchQuery UIManager::build_query(int page) const {
 }
 
 void UIManager::reset_filters() {
-    selected_source_ = WallpaperSource::ALL;
     allow_nsfw_ = false;
     selected_resolution_idx_ = 0;
     cat_anime_ = false;
@@ -700,7 +699,6 @@ void UIManager::execute_search(bool reset) {
     }
     show_toast("Buscando fondos…", true, 2.0f);
 
-    provider_->set_source(selected_source_);
     SearchQuery query = build_query(1);
     thread_pool_->enqueue([this, query, gen]() {
         // Descarte temprano si la búsqueda ya caducó antes de iniciarse en el pool
@@ -755,7 +753,6 @@ void UIManager::load_more() {
 
     is_loading_more_ = true;
     unsigned gen = search_generation_.load();
-    provider_->set_source(selected_source_);
     SearchQuery query = build_query(next_page_.load());
 
     thread_pool_->enqueue([this, query, gen]() {
@@ -1301,41 +1298,6 @@ void UIManager::render_filters_panel() {
     };
 
     auto render_section_resolution_order = [&]() {
-        SectionLabel("FUENTE");
-        struct SrcOpt {
-            const char* id;
-            const char* label;
-            IconFn icon;
-            WallpaperSource src;
-            const char* tip;
-        };
-        const SrcOpt src_opts[5] = {
-            { "##src_all", "Todas",     icons::DrawSparkle,      WallpaperSource::ALL,        "Busca en paralelo y combina Wallhaven, Reddit, Unsplash y Pexels" },
-            { "##src_wh",  "Wallhaven", icons::DrawPalette,      WallpaperSource::WALLHAVEN,  "Catálogo general, anime y arte digital" },
-            { "##src_rd",  "Reddit",    icons::DrawFlame,        WallpaperSource::REDDIT,     "Comunidades fotográficas y fondos de Reddit" },
-            { "##src_un",  "Unsplash",  icons::DrawMountain,     WallpaperSource::UNSPLASH,   "Fotografía artística de alta definición curada" },
-            { "##src_px",  "Pexels",    icons::DrawArchitecture, WallpaperSource::PEXELS,     "Fotografía real de alta resolución libre de derechos" }
-        };
-
-        const float g = 5.0f;
-        float avail = ImGui::GetContentRegionAvail().x;
-        int cols = (avail >= 440.0f) ? 5 : 3;
-        float w = std::min(106.0f, std::floor((avail - (cols - 1) * g) / cols));
-        for (int i = 0; i < 5; ++i) {
-            if (i % cols != 0) ImGui::SameLine(0.0f, g);
-            else if (i > 0) ImGui::Dummy(ImVec2(0.0f, g - ImGui::GetStyle().ItemSpacing.y));
-
-            bool active = (selected_source_ == src_opts[i].src);
-            if (PillToggle(src_opts[i].id, src_opts[i].icon, src_opts[i].label, active, w, 24.0f)) {
-                if (selected_source_ != src_opts[i].src) {
-                    selected_source_ = src_opts[i].src;
-                    trigger_search(true, false);
-                }
-            }
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", src_opts[i].tip);
-        }
-
-        ImGui::Dummy(ImVec2(0.0f, 4.0f));
         SectionLabel("RESOLUCIÓN");
         styled_combo_begin();
         if (combo("##ResCombo", &selected_resolution_idx_, kResolutionOptions, IM_ARRAYSIZE(kResolutionOptions), nullptr)) {
@@ -1415,17 +1377,16 @@ void UIManager::render_filters_panel() {
 
     auto render_sub_tone = [&]() {
         struct Tone { const char* id; const char* label; IconFn icon; ImU32 tint; const char* desc; };
-        const Tone tones[4] = {
+        const Tone tones[3] = {
             { "##t_all",  "Todos",     icons::DrawSparkle,   0,                           "Sin restricción de tono" },
             { "##t_warm", "Cálidos",   icons::DrawFlame,     IM_COL32(251, 146, 60, 255), "Rojos, naranjas, amarillos y rosas" },
-            { "##t_cool", "Fríos",     icons::DrawSnowflake, IM_COL32(56, 189, 248, 255), "Azules, cianes, verdes y violetas" },
-            { "##t_mono", "Monocromo", icons::DrawContrast,  IM_COL32(226, 232, 240, 255), "Solo escala de grises, sin ningún tono" }
+            { "##t_cool", "Fríos",     icons::DrawSnowflake, IM_COL32(56, 189, 248, 255), "Azules, cianes, verdes y violetas" }
         };
         const float g = 6.0f;
         float avail = ImGui::GetContentRegionAvail().x;
-        int cols = (avail >= 440.0f) ? 4 : 2;
-        float w = std::min(112.0f, std::floor((avail - (cols - 1) * g) / cols));
-        for (int i = 0; i < 4; ++i) {
+        int cols = 3;
+        float w = std::min(116.0f, std::floor((avail - (cols - 1) * g) / cols));
+        for (int i = 0; i < 3; ++i) {
             if (i % cols != 0) ImGui::SameLine(0.0f, g);
             else if (i > 0) ImGui::Dummy(ImVec2(0.0f, g - ImGui::GetStyle().ItemSpacing.y));
             bool active = (selected_temp_idx_ == i);
@@ -1449,7 +1410,7 @@ void UIManager::render_filters_panel() {
         FontScope fs(fonts().regular, kFontSmall);
         ImGui::PushStyleColor(ImGuiCol_Text, v4(kTextSubtle));
         ImGui::PushTextWrapPos(0.0f);
-        ImGui::TextUnformatted(tones[std::clamp(selected_temp_idx_, 0, 3)].desc);
+        ImGui::TextUnformatted(tones[std::clamp(selected_temp_idx_, 0, 2)].desc);
         ImGui::PopTextWrapPos();
         ImGui::PopStyleColor();
     };

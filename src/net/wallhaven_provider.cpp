@@ -55,9 +55,23 @@ std::string WallhavenProvider::build_search_url(const SearchQuery& query) const 
     if (!query.categories.empty()) {
         params.push_back("categories=" + HttpClient::url_encode(query.categories));
     }
-    if (!query.purity.empty()) {
-        params.push_back("purity=" + HttpClient::url_encode(query.purity));
+
+    std::string purity_str = query.purity;
+    if (query.allow_nsfw) {
+        if (!api_key_.empty()) {
+            purity_str = "111"; // Todo el catálogo (SFW + Sketchy + NSFW con API Key)
+        } else {
+            purity_str = "110"; // SFW + Sketchy (permitido públicamente sin API Key)
+        }
     }
+    if (!purity_str.empty()) {
+        params.push_back("purity=" + HttpClient::url_encode(purity_str));
+    }
+
+    if (!api_key_.empty()) {
+        params.push_back("apikey=" + HttpClient::url_encode(api_key_));
+    }
+
     if (!query.sorting.empty()) {
         params.push_back("sorting=" + HttpClient::url_encode(query.sorting));
     }
@@ -177,11 +191,17 @@ std::optional<WallpaperItem> WallhavenProvider::parse_details_json(const std::st
 }
 
 bool WallhavenProvider::needs_local_color_filter(const SearchQuery& query) {
-    return !query.color.empty() || !query.color_temperature.empty();
+    // Si es un solo color, confiamos al 100% en el filtro nativo del servidor de Wallhaven (colors=HEX).
+    // Solo activamos el filtrado local si el usuario activó Bicolor (para buscar el Color 2)
+    // o si seleccionó un filtro de temperatura (cálidos / fríos).
+    bool is_dual = query.combine_colors && !query.color.empty() && !query.color_secondary.empty();
+    bool is_temp = (query.color_temperature == "warm" || query.color_temperature == "cool");
+    return is_dual || is_temp;
 }
 
 std::vector<WallpaperItem> WallhavenProvider::apply_color_filters(std::vector<WallpaperItem> items, const SearchQuery& query) {
     if (!needs_local_color_filter(query)) {
+        // En monocolor: se devuelven todos los fondos devueltos por Wallhaven sin descartar nada
         return items;
     }
 
@@ -195,36 +215,42 @@ std::vector<WallpaperItem> WallhavenProvider::apply_color_filters(std::vector<Wa
 
     const bool dual = query.combine_colors && !query.color.empty() && !query.color_secondary.empty();
 
-    for (auto& it : items) {
-        if (dual) {
-            auto m = color::evaluate_dual(it.colors, query.color, query.color_secondary);
-            if (m.accepted) kept.push_back({std::move(it), m.score});
-        } else if (!query.color.empty()) {
-            auto m = color::evaluate_single(it.colors, query.color);
-            if (m.accepted) kept.push_back({std::move(it), m.score});
-        } else if (query.color_temperature == "neutral") {
-            if (color::is_strict_monochrome(it.colors)) kept.push_back({std::move(it), 0.0f});
-        } else if (query.color_temperature == "warm") {
-            if (color::matches_temperature(it.colors, color::Temperature::Warm)) kept.push_back({std::move(it), 0.0f});
-        } else if (query.color_temperature == "cool") {
-            if (color::matches_temperature(it.colors, color::Temperature::Cool)) kept.push_back({std::move(it), 0.0f});
-        } else {
-            kept.push_back({std::move(it), 0.0f});
+    if (dual) {
+        // Modo Bicolor: El Color 1 ya viene garantizado por la consulta colors=Color1 a Wallhaven.
+        // Nuestro motor refuerza estrictamente comprobar que el Color 2 (acento) esté presente en la paleta.
+        auto s_rgb = color::parse_hex(query.color_secondary);
+        if (s_rgb) {
+            color::Lab target_sec = color::to_lab(*s_rgb);
+            for (auto& it : items) {
+                auto pal = color::palette_to_lab(it.colors);
+                bool found_accent = false;
+                float best_de = 1e9f;
+                for (const auto& c : pal) {
+                    if (color::is_color_match(target_sec, c)) {
+                        found_accent = true;
+                        best_de = std::min(best_de, color::delta_e(target_sec, c));
+                    }
+                }
+                if (found_accent) {
+                    kept.push_back({std::move(it), best_de});
+                }
+            }
         }
-    }
 
-    // RED DE SEGURIDAD CRÍTICA:
-    // Si los filtros locales descartaron todos los elementos (ej. combinaciones muy restrictivas),
-    // NUNCA devolver una lista vacía si la API devolvió fondos válidos. Conservamos los fondos originales
-    // para que el usuario siempre tenga contenido disponible para explorar y aplicar.
-    if (kept.empty() && !items.empty()) {
+        // Ordenar por mayor fidelidad del color de acento
+        std::stable_sort(kept.begin(), kept.end(), [](const Scored& a, const Scored& b) {
+            return a.score < b.score;
+        });
+    } else if (query.color_temperature == "warm" || query.color_temperature == "cool") {
+        color::Temperature want = (query.color_temperature == "warm") ? color::Temperature::Warm : color::Temperature::Cool;
+        for (auto& it : items) {
+            if (color::matches_temperature(it.colors, want)) {
+                kept.push_back({std::move(it), 0.0f});
+            }
+        }
+    } else {
         return items;
     }
-
-    // Orden estable por calidad: las coincidencias más fieles primero (menor score perceptual)
-    std::stable_sort(kept.begin(), kept.end(), [](const Scored& a, const Scored& b) {
-        return a.score < b.score;
-    });
 
     std::vector<WallpaperItem> out;
     out.reserve(kept.size());
