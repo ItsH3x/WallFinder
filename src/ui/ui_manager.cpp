@@ -662,7 +662,7 @@ SearchQuery UIManager::build_query(int page) const {
         full_keywords += tag;
     }
     query.keywords = full_keywords;
-    query.purity = "110";
+    query.purity = cat_sketchy_ ? "110" : "100";
 
     switch (selected_resolution_idx_) {
         case 1: query.resolution = ResolutionFilter::FHD_1080P; break;
@@ -731,6 +731,7 @@ void UIManager::reset_filters() {
     cat_general_ = true;
     cat_anime_ = true;
     cat_people_ = true;
+    cat_sketchy_ = false;
     clear_thematic_categories();
     selected_sort_idx_ = 0;
     selected_temp_idx_ = 0;
@@ -1421,20 +1422,26 @@ void UIManager::render_filters_panel() {
             IconFn icon;
             bool* v;
             const char* tip;
+            ImU32 tint; // 0 para default, o color de alerta
         };
-        BaseCat base_cats[3] = {
-            { "##cat_gen", "General",  icons::DrawSparkle, &cat_general_, "Arte digital, paisajes, objetos y catálogo general" },
-            { "##cat_ani", "Anime",    icons::DrawAnime,   &cat_anime_,   "Anime, manga e ilustración japonesa" },
-            { "##cat_peo", "Personas", icons::DrawUser,    &cat_people_,  "Retratos, modelos y fotografía de personas" }
+        BaseCat base_cats[4] = {
+            { "##cat_gen", "General",        icons::DrawSparkle, &cat_general_, "Arte digital, paisajes, objetos y catálogo general", 0 },
+            { "##cat_ani", "Anime",          icons::DrawAnime,   &cat_anime_,   "Anime, manga e ilustración japonesa", 0 },
+            { "##cat_peo", "Personas",       icons::DrawUser,    &cat_people_,  "Retratos, modelos y fotografía de personas", 0 },
+            { "##cat_ske", "NSFW / Sketchy", icons::DrawAlert,   &cat_sketchy_, "Imágenes atrevidas o no aptas para todo público (+18 / Sketchy)", IM_COL32(239, 68, 68, 255) }
         };
 
         const float g = 6.0f;
         float avail = ImGui::GetContentRegionAvail().x;
-        int cols_base = 3;
+        int cols_base = std::clamp(static_cast<int>((avail + g) / (108.0f + g)), 2, 4);
         float w_base = std::min(116.0f, std::floor((avail - (cols_base - 1) * g) / cols_base));
-        for (int i = 0; i < 3; ++i) {
-            if (i > 0) ImGui::SameLine(0.0f, g);
-            if (PillToggle(base_cats[i].id, base_cats[i].icon, base_cats[i].label, *base_cats[i].v, w_base, 25.0f)) {
+        for (int i = 0; i < 4; ++i) {
+            if (i % cols_base != 0) {
+                ImGui::SameLine(0.0f, g);
+            } else if (i > 0) {
+                ImGui::Dummy(ImVec2(0.0f, g - ImGui::GetStyle().ItemSpacing.y));
+            }
+            if (PillToggle(base_cats[i].id, base_cats[i].icon, base_cats[i].label, *base_cats[i].v, w_base, 25.0f, *base_cats[i].v ? base_cats[i].tint : 0)) {
                 *base_cats[i].v = !*base_cats[i].v;
                 trigger_search(true, false);
             }

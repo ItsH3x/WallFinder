@@ -70,6 +70,7 @@ private:
     bool cat_general_{true};
     bool cat_anime_{true};
     bool cat_people_{true};
+    bool cat_sketchy_{false};
     bool cat_nature_{false};
     bool cat_gaming_{false};
     bool cat_cyberpunk_{false};
@@ -118,7 +119,7 @@ private:
         int count = 0;
         if (selected_resolution_idx_ != 0) ++count;
         if (selected_sort_idx_ != 0) ++count;
-        if (!cat_general_ || !cat_anime_ || !cat_people_) ++count;
+        if (!cat_general_ || !cat_anime_ || !cat_people_ || cat_sketchy_) ++count;
         if (cat_nature_ || cat_gaming_ || cat_cyberpunk_ || cat_digital_art_ ||
             cat_space_ || cat_vehicles_ || cat_fantasy_ || cat_minimalism_ ||
             cat_animals_ || cat_architecture_) ++count;
