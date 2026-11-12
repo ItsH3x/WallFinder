@@ -1,0 +1,39 @@
+# Build directory
+build/
+bin/
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ImGui local runtime configuration
+imgui.ini
+
+# CMake user files & caches
+CMakeUserPresets.json
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Temporary & Test files
+/tmp/
+*.log
+*.tmp
+*.bak
+*.bak_*
+scripts/update_kde_wallpapers.py.bak*
+
+# Core dump
+core
+core.*

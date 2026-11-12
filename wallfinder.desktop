@@ -1,0 +1,16 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=WallFinder
+GenericName=Buscador de Fondos de Pantalla
+GenericName[es]=Buscador de Fondos de Pantalla
+Comment=Explora, descarga y aplica fondos de pantalla en alta resolución para Linux Desktop
+Comment[es]=Explora, descarga y aplica fondos de pantalla en alta resolución para Linux Desktop
+Exec="/home/hex/Buscador de Fondos de Pantalla/assets/wallfinder-launcher.sh" %U
+Path=/home/hex/Buscador de Fondos de Pantalla
+Icon=wallfinder
+Terminal=false
+Categories=Graphics;Utility;
+Keywords=wallpaper;fondos;pantalla;wallhaven;desktop;background;kde;gnome;4k;1080p;ultrawide;
+StartupNotify=true
+StartupWMClass=wallpaper_finder
