@@ -80,6 +80,19 @@ private:
     bool cat_animals_{false};
     bool cat_architecture_{false};
 
+    void clear_thematic_categories() noexcept {
+        cat_nature_ = false;
+        cat_gaming_ = false;
+        cat_cyberpunk_ = false;
+        cat_digital_art_ = false;
+        cat_space_ = false;
+        cat_vehicles_ = false;
+        cat_fantasy_ = false;
+        cat_minimalism_ = false;
+        cat_animals_ = false;
+        cat_architecture_ = false;
+    }
+
     int selected_sort_idx_{0};
     std::atomic<int> next_page_{2};          // Siguiente página real de la API (puede saltar varias con filtros estrictos)
     std::atomic<bool> has_more_{true};

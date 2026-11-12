@@ -16,6 +16,8 @@
 #include <cstring>
 #include <filesystem>
 #include <iostream>
+#include <sstream>
+#include <unordered_map>
 
 namespace wallpaper {
 
@@ -541,12 +543,108 @@ void UIManager::setup_style() {
     c[ImGuiCol_TextSelectedBg]       = v4(IM_COL32(124, 131, 255, 90));
 }
 
+// Diccionario transparente de búsqueda (Español -> Inglés indexado por Wallhaven)
+static std::string translate_keywords_if_needed(const std::string& input) {
+    if (input.empty()) return {};
+
+    static const std::unordered_map<std::string, std::string> kDict = {
+        {"paisaje", "landscape"},
+        {"paisajes", "landscape"},
+        {"coche", "car"},
+        {"coches", "car"},
+        {"auto", "car"},
+        {"autos", "car"},
+        {"bosque", "forest"},
+        {"bosques", "forest"},
+        {"montaña", "mountain"},
+        {"montañas", "mountain"},
+        {"espacio", "space"},
+        {"universo", "space"},
+        {"ciudad", "city"},
+        {"ciudades", "city"},
+        {"noche", "night"},
+        {"atardecer", "sunset"},
+        {"amanecer", "sunrise"},
+        {"playa", "beach"},
+        {"playas", "beach"},
+        {"mar", "ocean"},
+        {"oceano", "ocean"},
+        {"océano", "ocean"},
+        {"flores", "flowers"},
+        {"flor", "flowers"},
+        {"fuego", "fire"},
+        {"agua", "water"},
+        {"lluvia", "rain"},
+        {"calle", "street"},
+        {"calles", "street"},
+        {"edificios", "architecture"},
+        {"oscuro", "dark"},
+        {"oscura", "dark"},
+        {"minimalista", "minimalism"},
+        {"minimalismo", "minimalism"},
+        {"videojuegos", "gaming"},
+        {"juegos", "gaming"},
+        {"animales", "animals"},
+        {"animal", "animals"},
+        {"chica", "girl"},
+        {"mujer", "girl"},
+        {"chico", "boy"},
+        {"hombre", "boy"},
+        {"galaxia", "galaxy"},
+        {"luna", "moon"},
+        {"sol", "sun"},
+        {"estrellas", "stars"}
+    };
+
+    // Pre-procesado: minúsculas preservando bytes UTF-8 válidos
+    std::string lower;
+    lower.reserve(input.size());
+    for (size_t i = 0; i < input.size(); ++i) {
+        unsigned char c = static_cast<unsigned char>(input[i]);
+        if (c == 0xC3 && i + 1 < input.size()) {
+            unsigned char next = static_cast<unsigned char>(input[i + 1]);
+            // Convertir mayúsculas acentuadas comunes (Á, É, Í, Ó, Ú, Ñ) a minúsculas UTF-8
+            if (next >= 0x80 && next <= 0x9E) {
+                lower.push_back(static_cast<char>(c));
+                lower.push_back(static_cast<char>(next + 0x20));
+                ++i;
+                continue;
+            }
+        }
+        lower.push_back(static_cast<char>(std::tolower(c)));
+    }
+
+    // Normalizar frases compuestas como "fondos oscuros" -> "dark"
+    auto replace_all = [](std::string& str, const std::string& from, const std::string& to) {
+        size_t start_pos = 0;
+        while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
+            str.replace(start_pos, from.length(), to);
+            start_pos += to.length();
+        }
+    };
+    replace_all(lower, "fondos oscuros", "dark");
+    replace_all(lower, "fondo oscuro", "dark");
+
+    std::istringstream iss(lower);
+    std::string token;
+    std::string result;
+    while (iss >> token) {
+        auto it = kDict.find(token);
+        std::string word = (it != kDict.end()) ? it->second : token;
+        if (!result.empty()) result += " ";
+        result += word;
+    }
+
+    return result.empty() ? input : result;
+}
+
 SearchQuery UIManager::build_query(int page) const {
     SearchQuery query;
     query.page = page;
 
-    // Palabras clave base del usuario + categorías temáticas
-    std::string full_keywords = search_text_;
+    // Palabras clave base del usuario con traducción transparente español -> inglés
+    std::string user_keywords = translate_keywords_if_needed(search_text_);
+    std::string full_keywords = user_keywords;
     std::vector<std::string> thematic_tags;
     if (cat_nature_) thematic_tags.push_back("landscape");
     if (cat_gaming_) thematic_tags.push_back("gaming");
@@ -564,7 +662,7 @@ SearchQuery UIManager::build_query(int page) const {
         full_keywords += tag;
     }
     query.keywords = full_keywords;
-    query.purity = "100";
+    query.purity = "110";
 
     switch (selected_resolution_idx_) {
         case 1: query.resolution = ResolutionFilter::FHD_1080P; break;
@@ -597,8 +695,22 @@ SearchQuery UIManager::build_query(int page) const {
         query.categories = cats;
     }
 
+    // Ordenación inteligente:
+    // Si selected_sort_idx_ == 0 ("Más populares"):
+    //   - Con keywords o temática: "relevance" para buscar sobre todo el catálogo histórico de Wallhaven.
+    //   - Sin keywords: "toplist" con top_range = "1y".
+    // Si selected_sort_idx_ > 0: respetar exactamente la opción seleccionada por el usuario.
     int sort = std::clamp(selected_sort_idx_, 0, kNumSortOptions - 1);
-    query.sorting = kSortOptions[sort].key;
+    if (sort == 0) {
+        if (!query.keywords.empty()) {
+            query.sorting = "relevance";
+        } else {
+            query.sorting = "toplist";
+            query.top_range = "1y";
+        }
+    } else {
+        query.sorting = kSortOptions[sort].key;
+    }
 
     auto preset_hex = [](int idx) -> std::string {
         return (idx > 0 && idx < kNumColorPresets) ? kColorPresets[idx].hex : "";
@@ -630,16 +742,7 @@ void UIManager::reset_filters() {
     selected_resolution_idx_ = 0;
     cat_anime_ = false;
     cat_people_ = false;
-    cat_nature_ = false;
-    cat_gaming_ = false;
-    cat_cyberpunk_ = false;
-    cat_digital_art_ = false;
-    cat_space_ = false;
-    cat_vehicles_ = false;
-    cat_fantasy_ = false;
-    cat_minimalism_ = false;
-    cat_animals_ = false;
-    cat_architecture_ = false;
+    clear_thematic_categories();
     selected_sort_idx_ = 0;
     selected_temp_idx_ = 0;
     selected_color_1_idx_ = 0;
@@ -1321,20 +1424,21 @@ void UIManager::render_filters_panel() {
             IconFn icon;
             bool* v;
             const char* tip;
+            bool is_thematic;
         };
         Cat cats[12] = {
-            { "##cat_a", "Anime",        icons::DrawAnime,        &cat_anime_,        "Anime, manga e ilustración japonesa" },
-            { "##cat_p", "Personas",     icons::DrawUser,         &cat_people_,       "Retratos, modelos y fotografía de personas" },
-            { "##cat_m", "Paisajes",     icons::DrawMountain,     &cat_nature_,       "Naturaleza, montañas, bosques y vistas panorámicas" },
-            { "##cat_g", "Videojuegos",  icons::DrawGamepad,      &cat_gaming_,       "Gaming, consolas, personajes y captura de juegos" },
-            { "##cat_c", "Cyberpunk",    icons::DrawBolt,         &cat_cyberpunk_,    "Sci-Fi, ciudades neón, futurismo y estética cyberpunk" },
-            { "##cat_d", "Arte Digital", icons::DrawPalette,      &cat_digital_art_,  "Concept art, renders 3D e ilustraciones digitales" },
-            { "##cat_s", "Espacio",      icons::DrawSpace,        &cat_space_,        "Cosmos, galaxias, nebulosas, planetas y astronomía" },
-            { "##cat_v", "Vehículos",    icons::DrawVehicles,     &cat_vehicles_,     "Autos, supercars, motocicletas, aviones y transporte" },
-            { "##cat_f", "Fantasía",     icons::DrawFantasy,      &cat_fantasy_,      "Magia, reinos fantásticos, mitología y castillos" },
-            { "##cat_mn","Minimalista",  icons::DrawMinimalism,   &cat_minimalism_,   "Composiciones limpias, formas simples y elegancia sutil" },
-            { "##cat_an","Animales",     icons::DrawAnimals,      &cat_animals_,      "Fauna silvestre, mascotas, aves y vida salvaje" },
-            { "##cat_ar","Arquitectura", icons::DrawArchitecture, &cat_architecture_, "Ciudades, rascacielos, metrópolis y diseño urbano" }
+            { "##cat_a", "Anime",        icons::DrawAnime,        &cat_anime_,        "Anime, manga e ilustración japonesa", false },
+            { "##cat_p", "Personas",     icons::DrawUser,         &cat_people_,       "Retratos, modelos y fotografía de personas", false },
+            { "##cat_m", "Paisajes",     icons::DrawMountain,     &cat_nature_,       "Naturaleza, montañas, bosques y vistas panorámicas", true },
+            { "##cat_g", "Videojuegos",  icons::DrawGamepad,      &cat_gaming_,       "Gaming, consolas, personajes y captura de juegos", true },
+            { "##cat_c", "Cyberpunk",    icons::DrawBolt,         &cat_cyberpunk_,    "Sci-Fi, ciudades neón, futurismo y estética cyberpunk", true },
+            { "##cat_d", "Arte Digital", icons::DrawPalette,      &cat_digital_art_,  "Concept art, renders 3D e ilustraciones digitales", true },
+            { "##cat_s", "Espacio",      icons::DrawSpace,        &cat_space_,        "Cosmos, galaxias, nebulosas, planetas y astronomía", true },
+            { "##cat_v", "Vehículos",    icons::DrawVehicles,     &cat_vehicles_,     "Autos, supercars, motocicletas, aviones y transporte", true },
+            { "##cat_f", "Fantasía",     icons::DrawFantasy,      &cat_fantasy_,      "Magia, reinos fantásticos, mitología y castillos", true },
+            { "##cat_mn","Minimalista",  icons::DrawMinimalism,   &cat_minimalism_,   "Composiciones limpias, formas simples y elegancia sutil", true },
+            { "##cat_an","Animales",     icons::DrawAnimals,      &cat_animals_,      "Fauna silvestre, mascotas, aves y vida salvaje", true },
+            { "##cat_ar","Arquitectura", icons::DrawArchitecture, &cat_architecture_, "Ciudades, rascacielos, metrópolis y diseño urbano", true }
         };
 
         const float g = 6.0f;
@@ -1350,7 +1454,15 @@ void UIManager::render_filters_panel() {
 
             // Cada categoría tiene su propio icono vectorial y NINGUNA palomita
             if (PillToggle(cats[i].id, cats[i].icon, cats[i].label, *cats[i].v, w, 25.0f)) {
-                *cats[i].v = !*cats[i].v;
+                if (cats[i].is_thematic) {
+                    bool was_active = *cats[i].v;
+                    clear_thematic_categories();
+                    if (!was_active) {
+                        *cats[i].v = true;
+                    }
+                } else {
+                    *cats[i].v = !*cats[i].v;
+                }
                 trigger_search(true, false);
             }
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", cats[i].tip);

@@ -266,11 +266,13 @@ int main() {
     assert(provider.get_name() == "Wallhaven");
 
     wallpaper::SearchQuery test_query;
+    assert(test_query.purity == "110");
+    assert(test_query.top_range == "1y");
+    assert(test_query.sorting == "toplist");
     test_query.keywords = "nature";
     test_query.resolution = wallpaper::ResolutionFilter::UHD_4K;
     test_query.ratio = "16x9";
     test_query.categories = "111";
-    test_query.purity = "100";
     test_query.sorting = "toplist";
     test_query.page = 1;
 
@@ -281,8 +283,9 @@ int main() {
     assert(search_url.find("resolutions=3840x2160") != std::string::npos);
     assert(search_url.find("ratios=16x9") != std::string::npos);
     assert(search_url.find("categories=111") != std::string::npos);
-    assert(search_url.find("purity=100") != std::string::npos);
+    assert(search_url.find("purity=110") != std::string::npos);
     assert(search_url.find("sorting=toplist") != std::string::npos);
+    assert(search_url.find("topRange=1y") != std::string::npos);
     assert(search_url.find("page=1") != std::string::npos);
 
     std::string details_url = provider.build_details_url("83w7kk");
@@ -897,16 +900,68 @@ int main() {
         assert(cool_res.size() == 1 && cool_res[0].id == "cool");
         std::cout << "  - Filtrado por ambiente de temperatura (Cálidos / Fríos): OK.\n";
 
-        // 10.4 Verificación de URL de Wallhaven (pureza SFW y apikey opcional)
-        wallpaper::SearchQuery sfw_q;
-        std::string sfw_url = provider.build_search_url(sfw_q);
-        assert(sfw_url.find("purity=100") != std::string::npos);
+        // 10.4 Verificación de SearchQuery y URL de Wallhaven (pureza 110 pública, topRange=1y y apikey opcional)
+        wallpaper::SearchQuery default_q;
+        assert(default_q.purity == "110");
+        assert(default_q.top_range == "1y");
+        assert(default_q.sorting == "toplist");
+        std::cout << "  - SearchQuery inicialización por defecto (purity=110, top_range=1y, sorting=toplist): OK.\n";
 
+        std::string sfw_url = provider.build_search_url(default_q);
+        assert(sfw_url.find("purity=110") != std::string::npos);
+        assert(sfw_url.find("topRange=1y") != std::string::npos);
+        assert(sfw_url.find("sorting=toplist") != std::string::npos);
+
+        // Sorting relevance no debe incluir topRange
+        wallpaper::SearchQuery rel_q = default_q;
+        rel_q.keywords = "cyberpunk";
+        rel_q.sorting = "relevance";
+        std::string rel_url = provider.build_search_url(rel_q);
+        assert(rel_url.find("sorting=relevance") != std::string::npos);
+        assert(rel_url.find("topRange") == std::string::npos);
+        assert(rel_url.find("purity=110") != std::string::npos);
+        std::cout << "  - URL con ordenación relevance excluye topRange y mantiene purity=110: OK.\n";
+
+        // Con API key opcional: no altera la pureza y añade el parámetro apikey
         provider.set_api_key("test_key_123");
-        std::string key_url = provider.build_search_url(sfw_q);
-        assert(key_url.find("purity=100") != std::string::npos);
+        std::string key_url = provider.build_search_url(default_q);
+        assert(key_url.find("purity=110") != std::string::npos);
+        assert(key_url.find("topRange=1y") != std::string::npos);
         assert(key_url.find("apikey=test_key_123") != std::string::npos);
-        std::cout << "  - Parámetros de pureza SFW (100) y API Key opcional en Wallhaven: OK.\n";
+        provider.set_api_key(""); // Limpiar para siguientes tests
+        std::cout << "  - Parámetros de pureza pública (110), topRange (1y) y API Key opcional en Wallhaven: OK.\n";
+
+        // 10.5 Verificación de resiliencia del rate limiting (250ms de espaciado y cancelación)
+        {
+            wallpaper::SearchQuery rl_q;
+            rl_q.keywords = "qa_throttle_test";
+
+            // Primera llamada registra el timestamp
+            auto res_init = provider.search_page(rl_q);
+            (void)res_init;
+
+            // Segunda llamada inmediata: debe aplicar un retraso mínimo de 250ms
+            auto t_start = std::chrono::steady_clock::now();
+            auto res_throttled = provider.search_page(rl_q);
+            (void)res_throttled;
+            auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - t_start
+            ).count();
+
+            assert(elapsed_ms >= 180);
+            std::cout << "  - Resiliencia del rate limiting (mínimo 250ms espaciado, medido: "
+                      << elapsed_ms << " ms): OK.\n";
+
+            // Cancelación cooperativa durante throttling
+            auto t_cancel_start = std::chrono::steady_clock::now();
+            auto cancel_res = provider.search_page(rl_q, []() { return true; });
+            auto cancel_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - t_cancel_start
+            ).count();
+            assert(cancel_res.items.empty());
+            assert(cancel_ms < 100);
+            std::cout << "  - Cancelación cooperativa en throttle (<100ms): OK.\n";
+        }
     }
     std::cout << "  [OK] Nueva arquitectura de color y filtros de Wallhaven verificada exitosamente.\n\n";
 

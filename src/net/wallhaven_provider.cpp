@@ -68,6 +68,11 @@ std::string WallhavenProvider::build_search_url(const SearchQuery& query) const 
         params.push_back("sorting=" + HttpClient::url_encode(query.sorting));
     }
 
+    if (query.sorting == "toplist") {
+        std::string tr = query.top_range.empty() ? "1y" : query.top_range;
+        params.push_back("topRange=" + HttpClient::url_encode(tr));
+    }
+
     std::string res_str = resolution_to_param(query.resolution, query.custom_resolution);
     if (!res_str.empty()) {
         params.push_back("resolutions=" + HttpClient::url_encode(res_str));
@@ -322,14 +327,16 @@ SearchPage WallhavenProvider::search_page(const SearchQuery& query, CancelPredic
     api_query.color_secondary.clear();
 
     const bool strict = needs_local_color_filter(query);
-    // Limitar a máximo 2 páginas API remotas (1 si no hay filtro de color estricto)
-    // para no agotar la cuota de 45 peticiones por minuto de Wallhaven.
-    const int max_api_pages = strict ? 2 : 1;
-    const size_t min_results = strict ? 8 : 1;
+    // Limitar a máximo 3 páginas API remotas (1 si no hay filtro de color estricto)
+    // para optimizar la recolección respetando la cuota de Wallhaven.
+    const int max_api_pages = strict ? 3 : 1;
+    const size_t min_results = strict ? 12 : 1;
     constexpr size_t kApiPageSize = 24;
 
     int page = std::max(1, query.page);
     int fetched = 0;
+    int last_page = 0;
+    size_t raw_count = 0;
     result.has_more = true;
 
     while (fetched < max_api_pages) {
@@ -361,7 +368,6 @@ SearchPage WallhavenProvider::search_page(const SearchQuery& query, CancelPredic
         }
 
         auto raw = parse_search_json(resp.body);
-        int last_page = 0;
         try {
             auto j = nlohmann::json::parse(resp.body);
             if (j.contains("meta") && j["meta"].is_object()) {
@@ -372,7 +378,7 @@ SearchPage WallhavenProvider::search_page(const SearchQuery& query, CancelPredic
 
         ++page;
         ++fetched;
-        size_t raw_count = raw.size();
+        raw_count = raw.size();
 
         auto filtered = apply_color_filters(std::move(raw), query);
         for (auto& it : filtered) result.items.push_back(std::move(it));
@@ -382,8 +388,15 @@ SearchPage WallhavenProvider::search_page(const SearchQuery& query, CancelPredic
             break;
         }
         if (result.items.size() >= min_results) {
+            result.has_more = (last_page == 0 || page <= last_page);
             break;
         }
+    }
+
+    if (last_page > 0) {
+        result.has_more = (page <= last_page) && (raw_count >= kApiPageSize);
+    } else if (raw_count < kApiPageSize && fetched > 0) {
+        result.has_more = false;
     }
 
     result.next_page = page;

@@ -17,8 +17,9 @@ struct SearchQuery {
     std::string custom_resolution;
     std::string ratio;                  // "16x9", "21x9", etc.
     std::string categories = "111";     // General, Anime, People (binary flags)
-    std::string purity = "100";         // Pureza Wallhaven ("100" = solo SFW)
+    std::string purity = "110";         // Pureza Wallhaven ("110" = SFW + Sketchy catálogo público)
     std::string sorting = "toplist";    // "toplist", "views", "date_added", "favorites", "relevance"
+    std::string top_range = "1y";       // Ventana de tiempo para sorting "toplist" ("1d", "3d", "1w", "1M", "3M", "6M", "1y")
     std::string color;                  // Hex sin '#' (ej. "cc0000", "0066cc")
     std::string color_secondary;        // Segundo color para combinación bicolor
     bool combine_colors = false;        // true: busca ambos colores en el mismo fondo
