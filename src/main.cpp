@@ -823,7 +823,7 @@ int main() {
         std::cout << "  - Comparador semántico de versiones (is_newer): OK.\n";
 
         // Consulta simulada o en endpoint (manejo seguro sin caída si no hay red)
-        auto vinfo = wallpaper::VersionChecker::check_latest("hex/wallfinder", "1.0.0", 2);
+        auto vinfo = wallpaper::VersionChecker::check_latest("ItsH3x/WallFinder", "1.0.0", 2);
         assert(vinfo.check_completed);
         std::cout << "  - Consulta y manejo resiliente ante red/timeout: OK.\n";
     }

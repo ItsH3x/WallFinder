@@ -65,7 +65,7 @@ public:
 
     // Consulta la API de GitHub para la última versión
     // Por defecto consulta el repositorio oficial / configurado
-    static VersionInfo check_latest(const std::string& repo = "hex/wallfinder", 
+    static VersionInfo check_latest(const std::string& repo = "ItsH3x/WallFinder", 
                                     const std::string& current_version = "1.0.0",
                                     long timeout_secs = 5) {
         VersionInfo info;

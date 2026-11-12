@@ -19,7 +19,7 @@ public:
     int download_concurrency{4};
     bool auto_set_wallpaper{true};
     DesktopEnvironment desktop_environment{DesktopEnvironment::UNKNOWN};
-    std::string github_repo{"hex/wallfinder"};
+    std::string github_repo{"ItsH3x/WallFinder"};
     bool check_updates_on_startup{true};
 
     // Singleton access

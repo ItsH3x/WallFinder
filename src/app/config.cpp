@@ -42,7 +42,7 @@ void Config::reset_defaults() {
     results_per_page = 24;
     download_concurrency = 4;
     auto_set_wallpaper = true;
-    github_repo = "hex/wallfinder";
+    github_repo = "ItsH3x/WallFinder";
     check_updates_on_startup = true;
 }
 
