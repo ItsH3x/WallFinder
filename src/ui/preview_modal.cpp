@@ -379,8 +379,6 @@ void PreviewModal::render(
 
                 is_action_in_progress_ = false;
                 if (res.success) {
-                    std::filesystem::path final_path = res.saved_path.empty() ? (dest_dir / wallpaper_setter.build_filename(target_item, dest_dir).filename()) : res.saved_path;
-                    wallpaper_setter.register_in_system_wallpapers(final_path, target_item);
                     set_status("¡Fondo aplicado y añadido al sistema!");
                     if (toast_cb) toast_cb("¡Fondo aplicado con éxito al escritorio y añadido a la lista del sistema!", true);
                 } else {

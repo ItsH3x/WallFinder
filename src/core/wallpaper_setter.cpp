@@ -294,58 +294,22 @@ bool WallpaperSetter::register_in_system_wallpapers(
 
     bool any_success = false;
 
-    // 1. KDE Plasma: ~/.local/share/wallpapers/<id>/contents/images/<width>x<height>.<ext> + metadata.json
+    // 1. KDE Plasma: KDE Plasma ya indexa de forma nativa los archivos de imagen sueltos
+    // en el directorio de fondos del usuario (~/Imágenes/Wallpapers/ o similar) y los aplica
+    // mediante plasma-apply-wallpaperimage. No debemos crear el paquete KPlugin en
+    // ~/.local/share/wallpapers/<pkg_id> porque eso causa que Plasma muestre el fondo dos veces.
     try {
         std::string pkg_id = "wallhaven_" + clean_id;
         std::filesystem::path kde_pkg_dir = base_share / "wallpapers" / pkg_id;
-        std::filesystem::path kde_images_dir = kde_pkg_dir / "contents" / "images";
-        std::filesystem::create_directories(kde_images_dir, ec);
-
-        std::string kde_img_name;
-        if (item.width > 0 && item.height > 0) {
-            kde_img_name = std::to_string(item.width) + "x" + std::to_string(item.height) + ext;
-        } else {
-            kde_img_name = image_path.filename().string();
+        std::error_code rm_ec;
+        if (std::filesystem::exists(kde_pkg_dir, rm_ec)) {
+            std::filesystem::remove_all(kde_pkg_dir, rm_ec);
         }
 
-        std::filesystem::path kde_img_target = kde_images_dir / kde_img_name;
-        if (safe_link_or_copy(abs_source, kde_img_target)) {
+        // Si la imagen está en el directorio de fondos del usuario (o accesible), contamos como éxito para KDE Plasma
+        if (std::filesystem::exists(abs_source, rm_ec)) {
             any_success = true;
         }
-
-        // Thumbnail / screenshot required by KDE Plasma wallpaper grid
-        std::filesystem::path kde_screenshot_target = kde_pkg_dir / "contents" / "screenshot.png";
-        safe_link_or_copy(abs_source, kde_screenshot_target);
-
-        // metadata.json (KDE Plasma 6 KPlugin)
-        std::filesystem::path metadata_path = kde_pkg_dir / "metadata.json";
-        nlohmann::json meta = {
-            {"KPlugin", {
-                {"Id", pkg_id},
-                {"Name", "Wallhaven " + clean_id},
-                {"Authors", nlohmann::json::array({{{"Name", "Wallhaven"}}})},
-                {"License", "CC-BY-SA-4.0"}
-            }}
-        };
-        std::ofstream meta_file(metadata_path);
-        if (meta_file.is_open()) {
-            meta_file << meta.dump(4) << '\n';
-            any_success = true;
-        }
-
-        // metadata.desktop (KDE Plasma 5 / KF5 compatibility)
-        std::filesystem::path desktop_meta_path = kde_pkg_dir / "metadata.desktop";
-        std::ofstream desk_file(desktop_meta_path);
-        if (desk_file.is_open()) {
-            desk_file << "[Desktop Entry]\n"
-                      << "Name=Wallhaven " << clean_id << "\n"
-                      << "X-KDE-PluginInfo-Name=" << pkg_id << "\n"
-                      << "X-KDE-PluginInfo-Author=Wallhaven\n"
-                      << "X-KDE-PluginInfo-License=CC-BY-SA-4.0\n";
-        }
-
-        // Notificar al cache de servicios de KDE Plasma si está disponible
-        std::system("kbuildsycoca6 --noincremental >/dev/null 2>&1 || kbuildsycoca5 --noincremental >/dev/null 2>&1");
     } catch (...) {
     }
 

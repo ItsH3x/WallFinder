@@ -612,24 +612,10 @@ int main() {
     bool reg_ok = setter.register_in_system_wallpapers(reg_sample_bmp, reg_item);
     assert(reg_ok);
 
-    // 1. KDE package verification: ~/.local/share/wallpapers/<id>/contents/images/<width>x<height>.<ext>
-    std::filesystem::path kde_pkg_img = test_sys_share / "wallpapers" / "wallhaven_reg_test_42" / "contents" / "images" / "1920x1080.bmp";
-    assert(std::filesystem::exists(kde_pkg_img));
-
-    // KDE metadata.json verification
-    std::filesystem::path kde_meta = test_sys_share / "wallpapers" / "wallhaven_reg_test_42" / "metadata.json";
-    assert(std::filesystem::exists(kde_meta));
-    std::ifstream kde_meta_in(kde_meta);
-    nlohmann::json kde_json;
-    kde_meta_in >> kde_json;
-    assert(kde_json.contains("KPlugin"));
-    assert(kde_json["KPlugin"]["Id"] == "wallhaven_reg_test_42");
-    assert(kde_json["KPlugin"]["Name"] == "Wallhaven reg_test_42");
-
-    // KDE screenshot / thumbnail verification (evita archivos planos redundantes que duplican en KDE)
-    std::filesystem::path kde_screenshot = test_sys_share / "wallpapers" / "wallhaven_reg_test_42" / "contents" / "screenshot.png";
-    assert(std::filesystem::exists(kde_screenshot));
-    std::cout << "    * KDE Plasma: Paquete de fondo, metadata.json y miniatura screenshot creados correctamente.\n";
+    // 1. KDE Plasma verification: No se crean paquetes duplicados en ~/.local/share/wallpapers/ y se limpia cualquier paquete antiguo
+    std::filesystem::path kde_pkg_dir = test_sys_share / "wallpapers" / "wallhaven_reg_test_42";
+    assert(!std::filesystem::exists(kde_pkg_dir));
+    std::cout << "    * KDE Plasma: Cero paquetes duplicados en ~/.local/share/wallpapers/ y limpieza de paquetes antiguos verificada.\n";
 
     // 2. GNOME verification: ~/.local/share/backgrounds/<filename> + XML
     std::filesystem::path gnome_bg_img = test_sys_share / "backgrounds" / reg_sample_bmp.filename();
