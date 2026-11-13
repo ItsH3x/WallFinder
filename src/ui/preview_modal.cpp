@@ -90,12 +90,11 @@ void PreviewModal::render(
 
     ImVec2 viewport_sz = ImGui::GetMainViewport()->WorkSize;
     ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-    float modal_w = std::min(1040.0f, viewport_sz.x * 0.92f);
-    float modal_h = std::min(780.0f, viewport_sz.y * 0.92f);
+    float modal_w = std::min(980.0f, viewport_sz.x * 0.92f);
     ImGui::SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-    ImGui::SetNextWindowSize(ImVec2(modal_w, modal_h), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(modal_w, 0.0f), ImGuiCond_Always);
 
-    if (ImGui::BeginPopupModal("Detalle del Fondo de Pantalla", &is_open_, ImGuiWindowFlags_NoCollapse)) {
+    if (ImGui::BeginPopupModal("Detalle del Fondo de Pantalla", &is_open_, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize)) {
         if (!is_open_) {
             close();
             ImGui::CloseCurrentPopup();
@@ -146,7 +145,7 @@ void PreviewModal::render(
         TextureInfo active_tex = is_full_res ? full_tex : thumb_tex;
 
         float max_preview_w = content_avail.x;
-        float max_preview_h = std::min(460.0f, modal_h * 0.54f);
+        float max_preview_h = std::min(460.0f, viewport_sz.y * 0.55f);
         float aspect = 16.0f / 9.0f;
         if (item_.width > 0 && item_.height > 0) {
             aspect = static_cast<float>(item_.width) / static_cast<float>(item_.height);
@@ -305,12 +304,22 @@ void PreviewModal::render(
         // 4. Botones de acción con estilo consistente según el sistema de diseño
         bool busy = is_action_in_progress_.load();
 
+        float btn_w = 210.0f;
+        float btn_h = 42.0f;
+        float gap_btn = 16.0f;
+        float total_btns_w = btn_w * 2.0f + gap_btn;
+        float avail_w = ImGui::GetContentRegionAvail().x;
+        float center_offset = (avail_w - total_btns_w) * 0.5f;
+        if (center_offset > 0.0f) {
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + center_offset);
+        }
+
         // Botón Guardar en Carpeta (botón secundario estilizado con icono de descarga)
         if (theme::Button(
                 "##btn_save",
                 icons::DrawDownload,
                 "Guardar en Carpeta",
-                ImVec2(220, 42),
+                ImVec2(btn_w, btn_h),
                 theme::ButtonKind::Secondary,
                 !busy
             )) {
@@ -348,14 +357,14 @@ void PreviewModal::render(
             });
         }
 
-        ImGui::SameLine(0.0f, 12.0f);
+        ImGui::SameLine(0.0f, gap_btn);
 
         // Botón Aplicar como Fondo (botón principal destacado con estilo éxito)
         if (theme::Button(
                 "##btn_apply",
                 icons::DrawDesktop,
                 "Aplicar como Fondo",
-                ImVec2(220, 42),
+                ImVec2(btn_w, btn_h),
                 theme::ButtonKind::Success,
                 !busy
             )) {
@@ -388,16 +397,7 @@ void PreviewModal::render(
             });
         }
 
-        ImGui::SameLine();
-        float btn_close_x = ImGui::GetWindowWidth() - 130.0f;
-        if (btn_close_x > ImGui::GetCursorPosX()) {
-            ImGui::SetCursorPosX(btn_close_x);
-        }
-
-        if (theme::Button("##btn_close", nullptr, "Cerrar", ImVec2(100, 42), theme::ButtonKind::Ghost)) {
-            close();
-            ImGui::CloseCurrentPopup();
-        }
+        ImGui::Dummy(ImVec2(0.0f, 6.0f));
 
         ImGui::EndPopup();
     }
