@@ -64,6 +64,7 @@ private:
     // Search and filter state
     char search_text_[256]{};
     int selected_resolution_idx_{0};
+    int selected_ratio_idx_{0};
     char custom_resolution_[64]{"1920x1080"};
 
     // Categorías base y temáticas
@@ -118,6 +119,7 @@ private:
     [[nodiscard]] int get_active_filter_count() const noexcept {
         int count = 0;
         if (selected_resolution_idx_ != 0) ++count;
+        if (selected_ratio_idx_ != 0) ++count;
         if (selected_sort_idx_ != 0) ++count;
         if (!cat_general_ || !cat_anime_ || !cat_people_ || cat_sketchy_) ++count;
         if (cat_nature_ || cat_gaming_ || cat_cyberpunk_ || cat_digital_art_ ||

@@ -79,6 +79,14 @@ const char* kResolutionOptions[] = {
     "Personalizada"
 };
 
+const char* kRatioOptions[] = {
+    "Cualquiera",
+    "16:9 Panorámico",
+    "21:9 Ultrawide",
+    "16:10 Portátil",
+    "9:16 Vertical"
+};
+
 constexpr float kZoomMin = 160.0f;
 constexpr float kZoomMax = 480.0f;
 constexpr float kZoomDefault = 220.0f;
@@ -674,6 +682,15 @@ SearchQuery UIManager::build_query(int page) const {
         default: query.resolution = ResolutionFilter::ANY; break;
     }
 
+    switch (selected_ratio_idx_) {
+        case 1: query.ratio = "16x9"; break;
+        case 2: query.ratio = "21x9"; break;
+        case 3: query.ratio = "16x10"; break;
+        case 4: query.ratio = "9x16"; break;
+        case 0:
+        default: query.ratio = ""; break;
+    }
+
     // Categorías de Wallhaven: General (100), Anime (010), Personas (001)
     // Se construyen directamente a partir de cat_general_, cat_anime_, cat_people_.
     std::string cats;
@@ -728,6 +745,7 @@ SearchQuery UIManager::build_query(int page) const {
 
 void UIManager::reset_filters() {
     selected_resolution_idx_ = 0;
+    selected_ratio_idx_ = 0;
     cat_general_ = true;
     cat_anime_ = true;
     cat_people_ = true;
@@ -1398,6 +1416,14 @@ void UIManager::render_filters_panel() {
             }
             ImGui::PopStyleVar(2);
         }
+
+        ImGui::Dummy(ImVec2(0.0f, 4.0f));
+        SectionLabel("RELACIÓN DE ASPECTO");
+        styled_combo_begin();
+        if (combo("##RatioCombo", &selected_ratio_idx_, kRatioOptions, IM_ARRAYSIZE(kRatioOptions), nullptr)) {
+            trigger_search(true, false);
+        }
+        styled_combo_end();
 
         ImGui::Dummy(ImVec2(0.0f, 4.0f));
         SectionLabel("ORDENAR POR");
